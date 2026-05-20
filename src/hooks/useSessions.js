@@ -57,6 +57,42 @@ export function useSessions() {
     [dispatch],
   );
 
+  /**
+   * 共有URL等から取り込んだセッションテンプレートを新規 id で複製・保存する。
+   * payments / directPayments / driverDiscount / manualDiffPayerId を含む
+   * 完全な状態を 1 アクションで作成・永続化する。
+   *
+   * @param {Partial<import('@/lib/calculator').Session>} template
+   * @returns {string} 新しい session id
+   */
+  const importSession = useCallback(
+    (template) => {
+      const now = new Date().toISOString();
+      const session = {
+        id: genId('s'),
+        name: template?.name || '',
+        members: (template?.members ?? []).map((m) => ({
+          id: m?.id ?? genId('m'),
+          name: m?.name ?? '',
+        })),
+        currency: template?.currency ?? 'JPY',
+        rounding: template?.rounding ?? 'floor',
+        payments: Array.isArray(template?.payments) ? template.payments : [],
+        directPayments: Array.isArray(template?.directPayments)
+          ? template.directPayments
+          : [],
+        driverDiscount: template?.driverDiscount,
+        manualDiffPayerId: template?.manualDiffPayerId,
+        createdAt: now,
+        updatedAt: now,
+      };
+      dispatch({ type: 'CREATE_SESSION', session });
+      persistSession(session);
+      return session.id;
+    },
+    [dispatch],
+  );
+
   const openSession = useCallback(
     (id) => dispatch({ type: 'OPEN_SESSION', id }),
     [dispatch],
@@ -127,6 +163,7 @@ export function useSessions() {
     currentSession,
     hydrated: state.hydrated,
     createSession,
+    importSession,
     openSession,
     closeSession,
     deleteSession,

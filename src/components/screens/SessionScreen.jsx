@@ -2,7 +2,8 @@ import PropTypes from 'prop-types';
 import { useCallback, useMemo, useState } from 'react';
 import Button from '@/components/ui/Button';
 import Card from '@/components/ui/Card';
-import { formatAmount } from '@/lib/currency';
+import SegmentedToggle from '@/components/ui/SegmentedToggle';
+import { formatAmount, SUPPORTED_CURRENCIES } from '@/lib/currency';
 import { WAIVED_ICON } from '@/lib/icons';
 import { calculateSettlement } from '@/lib/calculator';
 import { useSessions } from '@/hooks/useSessions';
@@ -120,6 +121,42 @@ function SessionScreen({
     [handleAddMember],
   );
 
+  // 端数処理モード切替（要件 §3.6）
+  const roundingOptions = useMemo(
+    () => [
+      { value: 'floor', label: t('session.roundingFloor') },
+      { value: 'ceil', label: t('session.roundingCeil') },
+      { value: 'round', label: t('session.roundingRound') },
+    ],
+    [t],
+  );
+  const handleRoundingChange = useCallback(
+    /** @param {string} v */
+    (v) => {
+      if (currentSession) patchSession(currentSession.id, { rounding: v });
+    },
+    [currentSession, patchSession],
+  );
+
+  // セッション内通貨切替（要件 §3.11）
+  const handleSessionCurrency = useCallback(
+    /** @param {React.ChangeEvent<HTMLSelectElement>} e */
+    (e) => {
+      if (currentSession) {
+        patchSession(currentSession.id, { currency: e.target.value });
+      }
+    },
+    [currentSession, patchSession],
+  );
+  const currencyOptions = useMemo(
+    () =>
+      SUPPORTED_CURRENCIES.map((c) => ({
+        code: c.code,
+        label: lang === 'en' ? c.labelEn : c.labelJa,
+      })),
+    [lang],
+  );
+
   // セッション未選択時の保険（通常は App ルーターがホームに戻すが念のため）
   if (!currentSession) {
     return (
@@ -177,6 +214,35 @@ function SessionScreen({
             + {t('session.addMember')}
           </Button>
         </div>
+      </Card>
+
+      <Card className="flex flex-col gap-3">
+        <h3 className="app-text-muted text-sm font-semibold">
+          {t('session.settings')}
+        </h3>
+        <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
+          <span className="app-text">{t('session.rounding')}</span>
+          <SegmentedToggle
+            label={t('session.rounding')}
+            options={roundingOptions}
+            value={currentSession.rounding ?? 'floor'}
+            onChange={handleRoundingChange}
+          />
+        </div>
+        <label className="flex flex-wrap items-center justify-between gap-2 text-sm">
+          <span className="app-text">{t('currency.label')}</span>
+          <select
+            value={currentSession.currency ?? 'JPY'}
+            onChange={handleSessionCurrency}
+            className="app-card app-field border px-2 py-1 text-xs"
+          >
+            {currencyOptions.map((opt) => (
+              <option key={opt.code} value={opt.code}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+        </label>
       </Card>
 
       <div className="flex flex-col gap-3">
