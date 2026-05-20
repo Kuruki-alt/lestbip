@@ -1,28 +1,26 @@
 import PropTypes from 'prop-types';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo } from 'react';
 import Button from '@/components/ui/Button';
 import Card from '@/components/ui/Card';
-import {
-  MOCK_DIRECT_PAYMENTS,
-  MOCK_MEMBERS,
-  MOCK_TRANSFERS,
-  WAIVED_ICON,
-} from '@/lib/mockData';
 import { distanceToDiscountPct } from '@/lib/driverDiscount';
 import { formatAmount } from '@/lib/currency';
+import { WAIVED_ICON } from '@/lib/icons';
+import { calculateSettlement } from '@/lib/calculator';
+import { useSessions } from '@/hooks/useSessions';
 
 /**
  * 精算結果詳細画面：
- * 「誰が誰にいくら」最小送金リスト（モック）+ 差額調整（手動で負担者選択）。
- * 御者割が有効なときは「全体の御者割」をここで指定でき、各支払いの
- * 御者割より優先される。計算本体は未実装（ワイヤーフレームのスコープ外）。
+ * - 最小送金リストを calculator でライブ算出
+ * - 差し引き済みの直接やり取りを表示
+ * - 端数差額の手動負担者をセッションへ反映（patchSession）
+ * - 御者割が有効なときは全体御者割（御者ID＋全行程距離）を編集可能（個別より優先）
  *
  * @param {Object} props
  * @param {(key: string) => string} props.t
  * @param {'ja'|'en'} props.lang
  * @param {import('@/lib/currency').CurrencyCode} props.currency
- * @param {boolean} [props.driverDiscountEnabled=false] 御者割が有効か
- * @param {() => void} props.onBack  セッションへ戻る
+ * @param {boolean} [props.driverDiscountEnabled=false]
+ * @param {() => void} props.onBack
  */
 function SettlementScreen({
   t,
@@ -31,53 +29,111 @@ function SettlementScreen({
   driverDiscountEnabled = false,
   onBack,
 }) {
-  // Map で保持し動的プロパティアクセス（object injection）を回避
-  const memberNameById = useMemo(
-    () => new Map(MOCK_MEMBERS.map((m) => [m.id, m.name])),
-    [],
+  const { currentSession, patchSession } = useSessions();
+  const members = useMemo(
+    () => currentSession?.members ?? [],
+    [currentSession],
+  );
+  const directPayments = useMemo(
+    () => currentSession?.directPayments ?? [],
+    [currentSession],
   );
 
-  // ローカルUI状態: 端数差額の手動負担者（メンバーID）
-  const [adjustMemberId, setAdjustMemberId] = useState(MOCK_MEMBERS[0].id);
+  const memberNameById = useMemo(
+    () => new Map(members.map((m) => [m.id, m.name])),
+    [members],
+  );
 
-  // ローカルUI状態: 全体の御者割（御者ID・全行程の移動距離 km, 文字列保持）
-  const [coachmanId, setCoachmanId] = useState(MOCK_MEMBERS[0].id);
-  const [distanceKm, setDistanceKm] = useState('');
+  // 端数差額の手動負担者と御者割の現在値はセッション側に置く（永続化される）
+  const adjustMemberId = currentSession?.manualDiffPayerId ?? members[0]?.id;
+  // overallDD は session の値 or 既定。参照を安定させ依存配列に乗せやすくする。
+  const overallDD = useMemo(
+    () =>
+      currentSession?.driverDiscount ?? {
+        enabled: false,
+        coachmanId: members[0]?.id ?? '',
+        distanceKm: '',
+      },
+    [currentSession, members],
+  );
+
+  // calculator は overallDD.enabled に基づき適用するため、UI トグルが ON のときだけ
+  // セッションに enabled:true を伝える運用にする（Phase 2 の単純化）
+  const sessionForCalc = useMemo(
+    () =>
+      currentSession
+        ? {
+            ...currentSession,
+            driverDiscount: driverDiscountEnabled
+              ? { ...overallDD, enabled: true }
+              : { ...overallDD, enabled: false },
+          }
+        : null,
+    [currentSession, driverDiscountEnabled, overallDD],
+  );
+
+  const settlement = useMemo(
+    () => (sessionForCalc ? calculateSettlement(sessionForCalc) : null),
+    [sessionForCalc],
+  );
 
   const handleSelectAdjust = useCallback(
     /** @param {React.MouseEvent<HTMLButtonElement>} e */
     (e) => {
       const id = e.currentTarget.dataset.value;
-      if (id) {
-        setAdjustMemberId(id);
+      if (id && currentSession) {
+        patchSession(currentSession.id, { manualDiffPayerId: id });
       }
     },
-    [],
+    [currentSession, patchSession],
   );
 
   const handleCoachman = useCallback(
     /** @param {React.ChangeEvent<HTMLSelectElement>} e */
-    (e) => setCoachmanId(e.target.value),
-    [],
+    (e) => {
+      if (!currentSession) return;
+      patchSession(currentSession.id, {
+        driverDiscount: { ...overallDD, coachmanId: e.target.value },
+      });
+    },
+    [currentSession, overallDD, patchSession],
   );
 
   const handleDistance = useCallback(
     /** @param {React.ChangeEvent<HTMLInputElement>} e */
-    (e) => setDistanceKm(e.target.value),
-    [],
+    (e) => {
+      if (!currentSession) return;
+      patchSession(currentSession.id, {
+        driverDiscount: { ...overallDD, distanceKm: e.target.value },
+      });
+    },
+    [currentSession, overallDD, patchSession],
   );
 
   const coachmanOptions = useMemo(
     () =>
-      MOCK_MEMBERS.map((m) => (
+      members.map((m) => (
         <option key={m.id} value={m.id}>
           {m.name}
         </option>
       )),
-    [],
+    [members],
   );
 
-  const overallDiscountPct = distanceToDiscountPct(distanceKm);
+  const overallDiscountPct = distanceToDiscountPct(overallDD.distanceKm);
+
+  if (!currentSession) {
+    return (
+      <div className="flex flex-col gap-3">
+        <Button variant="ghost" onClick={onBack}>
+          ← {t('common.back')}
+        </Button>
+        <Card>
+          <p className="app-text-muted text-sm">{t('home.empty')}</p>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-5">
@@ -105,7 +161,7 @@ function SettlementScreen({
               {t('payment.coachman')}
             </span>
             <select
-              value={coachmanId}
+              value={overallDD.coachmanId ?? ''}
               onChange={handleCoachman}
               className="app-card app-field border px-3 py-2"
             >
@@ -121,7 +177,7 @@ function SettlementScreen({
               type="number"
               inputMode="numeric"
               min="0"
-              value={distanceKm}
+              value={overallDD.distanceKm ?? ''}
               onChange={handleDistance}
               placeholder="0"
               className="app-card app-field border px-3 py-2"
@@ -141,25 +197,29 @@ function SettlementScreen({
         <h3 className="app-text-muted text-sm font-semibold">
           {t('settlement.minTransfers')}
         </h3>
-        <ul className="flex flex-col gap-2">
-          {MOCK_TRANSFERS.map((tr) => (
-            <li
-              key={tr.id}
-              className="app-card app-surface-2 flex items-center justify-between px-3 py-2 text-sm"
-            >
-              <span className="app-text">
-                {memberNameById.get(tr.fromId)} {t('settlement.pays')}{' '}
-                {memberNameById.get(tr.toId)}
-              </span>
-              <span className="app-accent-fg font-bold">
-                {formatAmount(tr.amount, currency, lang)}
-              </span>
-            </li>
-          ))}
-        </ul>
+        {!settlement || settlement.transfers.length === 0 ? (
+          <p className="app-text-muted text-sm">{t('session.summaryEmpty')}</p>
+        ) : (
+          <ul className="flex flex-col gap-2">
+            {settlement.transfers.map((tr) => (
+              <li
+                key={tr.id}
+                className="app-card app-surface-2 flex items-center justify-between px-3 py-2 text-sm"
+              >
+                <span className="app-text">
+                  {memberNameById.get(tr.fromId) ?? '?'} {t('settlement.pays')}{' '}
+                  {memberNameById.get(tr.toId) ?? '?'}
+                </span>
+                <span className="app-accent-fg font-bold">
+                  {formatAmount(tr.amount, currency, lang)}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
       </Card>
 
-      {MOCK_DIRECT_PAYMENTS.length > 0 ? (
+      {directPayments.length > 0 ? (
         <Card className="flex flex-col gap-3">
           <h3 className="app-text-muted text-sm font-semibold">
             {t('settlement.deducted')}
@@ -168,14 +228,14 @@ function SettlementScreen({
             {t('settlement.deductedHint')}
           </p>
           <ul className="flex flex-col gap-2">
-            {MOCK_DIRECT_PAYMENTS.map((d) => (
+            {directPayments.map((d) => (
               <li
                 key={d.id}
                 className="app-card app-accent-soft flex items-center justify-between px-3 py-2 text-sm"
               >
                 <span className="flex items-center gap-2 app-text">
-                  {memberNameById.get(d.fromId)} {t('settlement.pays')}{' '}
-                  {memberNameById.get(d.toId)}
+                  {memberNameById.get(d.fromId) ?? '?'} {t('settlement.pays')}{' '}
+                  {memberNameById.get(d.toId) ?? '?'}
                   {d.waived ? (
                     <span
                       title={t('session.waivedBadge')}
@@ -195,40 +255,43 @@ function SettlementScreen({
         </Card>
       ) : null}
 
-      <Card className="flex flex-col gap-3">
-        <h3 className="app-text-muted text-sm font-semibold">
-          {t('settlement.adjustment')}
-        </h3>
-        <p className="app-text-muted text-xs">
-          {t('settlement.adjustmentHint')}
-        </p>
-        <div className="flex items-center justify-between text-sm">
-          <span className="app-text">{t('settlement.diff')}</span>
-          <span className="app-text font-semibold">
-            +{formatAmount(2, currency, lang)}
-          </span>
-        </div>
-        <div>
-          <p className="mb-2 app-text-muted text-xs font-semibold">
-            {t('settlement.adjustmentTarget')}
+      {settlement && Math.abs(settlement.roundingDiff) > 0 ? (
+        <Card className="flex flex-col gap-3">
+          <h3 className="app-text-muted text-sm font-semibold">
+            {t('settlement.adjustment')}
+          </h3>
+          <p className="app-text-muted text-xs">
+            {t('settlement.adjustmentHint')}
           </p>
-          <div className="flex flex-wrap gap-2">
-            {MOCK_MEMBERS.map((m) => {
-              const selected = m.id === adjustMemberId;
-              return (
-                <Button
-                  key={m.id}
-                  variant={selected ? 'primary' : 'secondary'}
-                  dataValue={m.id}
-                  onClick={handleSelectAdjust}
-                >
-                  {m.name}
-                </Button>
-              );
-            })}
+          <div className="flex items-center justify-between text-sm">
+            <span className="app-text">{t('settlement.diff')}</span>
+            <span className="app-text font-semibold">
+              {settlement.roundingDiff > 0 ? '+' : ''}
+              {formatAmount(settlement.roundingDiff, currency, lang)}
+            </span>
           </div>
-        </div>
-      </Card>
+          <div>
+            <p className="mb-2 app-text-muted text-xs font-semibold">
+              {t('settlement.adjustmentTarget')}
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {members.map((m) => {
+                const selected = m.id === adjustMemberId;
+                return (
+                  <Button
+                    key={m.id}
+                    variant={selected ? 'primary' : 'secondary'}
+                    dataValue={m.id}
+                    onClick={handleSelectAdjust}
+                  >
+                    {m.name}
+                  </Button>
+                );
+              })}
+            </div>
+          </div>
+        </Card>
+      ) : null}
     </div>
   );
 }

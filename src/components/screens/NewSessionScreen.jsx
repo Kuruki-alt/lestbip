@@ -2,18 +2,21 @@ import PropTypes from 'prop-types';
 import { useCallback, useRef, useState } from 'react';
 import Button from '@/components/ui/Button';
 import Card from '@/components/ui/Card';
+import { useSessions } from '@/hooks/useSessions';
 
 /**
  * 新規セッション作成画面：
  * セッション名を入力し、まずメンバーを追加してから作成する（要件 §3.1 / §3.2）。
- * ワイヤーフレームのため永続化は行わず、UI と遷移のみ。
+ * 作成は useSessions.createSession を介して LocalStorage まで永続化される。
  *
  * @param {Object} props
  * @param {(key: string) => string} props.t
+ * @param {import('@/lib/currency').CurrencyCode} [props.defaultCurrency='JPY']
  * @param {() => void} props.onBack    ホームへ戻る
  * @param {() => void} props.onCreate  セッション画面へ進む
  */
-function NewSessionScreen({ t, onBack, onCreate }) {
+function NewSessionScreen({ t, defaultCurrency = 'JPY', onBack, onCreate }) {
+  const { createSession } = useSessions();
   // ローカルUI状態: { name: string, members: {id,string}[], draft: string }
   const [sessionName, setSessionName] = useState('');
   const [members, setMembers] = useState(
@@ -82,9 +85,19 @@ function NewSessionScreen({ t, onBack, onCreate }) {
       if (!canCreate) {
         return;
       }
+      const name = sessionName.trim() || t('newSession.untitled');
+      createSession(name, members, { currency: defaultCurrency });
       onCreate();
     },
-    [canCreate, onCreate],
+    [
+      canCreate,
+      sessionName,
+      members,
+      createSession,
+      defaultCurrency,
+      onCreate,
+      t,
+    ],
   );
 
   return (
@@ -175,6 +188,7 @@ function NewSessionScreen({ t, onBack, onCreate }) {
 
 NewSessionScreen.propTypes = {
   t: PropTypes.func.isRequired,
+  defaultCurrency: PropTypes.oneOf(['JPY', 'USD', 'EUR', 'CAD']),
   onBack: PropTypes.func.isRequired,
   onCreate: PropTypes.func.isRequired,
 };

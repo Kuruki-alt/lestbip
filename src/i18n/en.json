@@ -28,6 +28,7 @@
   "home.history": "Past sessions",
   "home.empty": "No sessions yet",
   "home.openSession": "Open",
+  "home.confirmDelete": "Delete this adventure?",
 
   "newSession.title": "Create new session",
   "newSession.nameLabel": "Session name",
@@ -38,10 +39,13 @@
   "newSession.empty": "No members yet. Add a name to get started",
   "newSession.create": "Create with these members",
   "newSession.needMember": "Add at least one member",
+  "newSession.untitled": "Untitled adventure",
 
   "session.payments": "Payments",
+  "session.paymentsEmpty": "No payments yet",
   "session.addPayment": "Add payment",
   "session.summary": "Settlement summary",
+  "session.summaryEmpty": "No transfers needed yet",
   "session.viewSettlement": "Settlement details",
   "session.share": "Share via URL",
   "session.paidBy": "Paid by",
