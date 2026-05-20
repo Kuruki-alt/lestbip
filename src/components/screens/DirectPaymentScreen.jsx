@@ -2,7 +2,7 @@ import PropTypes from 'prop-types';
 import { useCallback, useMemo, useState } from 'react';
 import Button from '@/components/ui/Button';
 import Card from '@/components/ui/Card';
-import { MOCK_MEMBERS } from '@/lib/mockData';
+import { useSessions } from '@/hooks/useSessions';
 
 /**
  * 個人間の支払い（返済）記録画面：
@@ -17,9 +17,17 @@ import { MOCK_MEMBERS } from '@/lib/mockData';
  * @param {() => void} props.onWaive   「いいよいいよ〜^^」金額不問で完遂（免除）
  */
 function DirectPaymentScreen({ t, onSave, onCancel, onWaive }) {
+  const { currentSession } = useSessions();
+  const members = useMemo(
+    () => currentSession?.members ?? [],
+    [currentSession],
+  );
+
   // ローカルUI状態: { fromId, toId, amount }
-  const [fromId, setFromId] = useState(MOCK_MEMBERS[0].id);
-  const [toId, setToId] = useState(MOCK_MEMBERS[1].id);
+  const [fromId, setFromId] = useState(() => members[0]?.id ?? '');
+  const [toId, setToId] = useState(
+    () => members[1]?.id ?? members[0]?.id ?? '',
+  );
   const [amount, setAmount] = useState('');
 
   const handleFrom = useCallback(
@@ -68,15 +76,28 @@ function DirectPaymentScreen({ t, onSave, onCancel, onWaive }) {
 
   const memberOptions = useMemo(
     () =>
-      MOCK_MEMBERS.map((m) => (
+      members.map((m) => (
         <option key={m.id} value={m.id}>
           {m.name}
         </option>
       )),
-    [],
+    [members],
   );
 
   const selectClass = 'app-card app-field border px-3 py-2';
+
+  if (!currentSession) {
+    return (
+      <div className="flex flex-col gap-3">
+        <Button variant="ghost" onClick={onCancel}>
+          ← {t('common.cancel')}
+        </Button>
+        <Card>
+          <p className="app-text-muted text-sm">{t('home.empty')}</p>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <form className="flex flex-col gap-5" onSubmit={handleSubmit}>

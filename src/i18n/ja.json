@@ -28,6 +28,7 @@
   "home.history": "冒険の足あと",
   "home.empty": "まだ冒険に出ていません",
   "home.openSession": "つづきから",
+  "home.confirmDelete": "この冒険の記録を消しますか？",
 
   "newSession.title": "新たな冒険へ旅立つ",
   "newSession.nameLabel": "冒険の名前",
@@ -38,10 +39,13 @@
   "newSession.empty": "まだ仲間がいません。名前を入れて仲間にしましょう",
   "newSession.create": "この仲間で旅立つ",
   "newSession.needMember": "仲間を1人以上集めてください",
+  "newSession.untitled": "名もなき冒険",
 
   "session.payments": "出費の記録",
+  "session.paymentsEmpty": "まだ出費の記録はありません",
   "session.addPayment": "出費をつける",
   "session.summary": "山分けのみとおし",
+  "session.summaryEmpty": "送金の必要はまだありません",
   "session.viewSettlement": "山分けをくわしく",
   "session.share": "冒険を分かちあう",
   "session.paidBy": "立替えた仲間",

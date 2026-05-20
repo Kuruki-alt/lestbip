@@ -12,6 +12,7 @@ import { useTheme } from '@/hooks/useTheme';
 import { useScreenRouter } from '@/hooks/useScreenRouter';
 import { useDriverDiscount } from '@/hooks/useDriverDiscount';
 import { useCurrency } from '@/hooks/useCurrency';
+import { useSessions } from '@/hooks/useSessions';
 
 /**
  * アプリのルート。
@@ -26,7 +27,15 @@ function App() {
   // オプション機能のため既定は無効
   const { enabled: driverDiscount, setEnabled: setDriverDiscount } =
     useDriverDiscount(false);
-  const { currency, setCurrency } = useCurrency('JPY');
+  const { currency: defaultCurrency, setCurrency } = useCurrency('JPY');
+  const {
+    currentSession,
+    openSession: storeOpenSession,
+    closeSession,
+  } = useSessions();
+
+  // 表示通貨: セッションが開いている時は session.currency、無ければ既定
+  const displayCurrency = currentSession?.currency ?? defaultCurrency;
 
   const handleDriverDiscountChange = useCallback(
     /** @param {string} v 'on' | 'off' */
@@ -34,7 +43,10 @@ function App() {
     [setDriverDiscount],
   );
 
-  const goHome = useCallback(() => navigate('home'), [navigate]);
+  const goHome = useCallback(() => {
+    closeSession();
+    navigate('home');
+  }, [closeSession, navigate]);
   const goNewSession = useCallback(() => navigate('newSession'), [navigate]);
   const goSession = useCallback(() => navigate('session'), [navigate]);
   const goSettlement = useCallback(() => navigate('settlement'), [navigate]);
@@ -43,7 +55,16 @@ function App() {
     [navigate],
   );
 
-  const openSession = useCallback(() => navigate('session'), [navigate]);
+  const openSession = useCallback(
+    /** @param {string} id */
+    (id) => {
+      storeOpenSession(id);
+      navigate('session');
+    },
+    [storeOpenSession, navigate],
+  );
+
+  const afterCreateSession = useCallback(() => navigate('session'), [navigate]);
 
   const editPayment = useCallback(
     /** @param {string|null} paymentId */
@@ -67,20 +88,27 @@ function App() {
       onColorModeChange={setColorMode}
       driverDiscount={driverDiscount ? 'on' : 'off'}
       onDriverDiscountChange={handleDriverDiscountChange}
-      currency={currency}
+      currency={displayCurrency}
       onCurrencyChange={setCurrency}
     />
   );
 
   let body;
   if (screen === 'newSession') {
-    body = <NewSessionScreen t={t} onBack={goHome} onCreate={goSession} />;
+    body = (
+      <NewSessionScreen
+        t={t}
+        defaultCurrency={defaultCurrency}
+        onBack={goHome}
+        onCreate={afterCreateSession}
+      />
+    );
   } else if (screen === 'session') {
     body = (
       <SessionScreen
         t={t}
         lang={lang}
-        currency={currency}
+        currency={displayCurrency}
         onBack={goHome}
         onEditPayment={editPayment}
         onAddDirectPayment={goDirectPayment}
@@ -112,7 +140,7 @@ function App() {
       <SettlementScreen
         t={t}
         lang={lang}
-        currency={currency}
+        currency={displayCurrency}
         driverDiscountEnabled={driverDiscount}
         onBack={goSession}
       />

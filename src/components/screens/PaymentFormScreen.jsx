@@ -2,20 +2,22 @@ import PropTypes from 'prop-types';
 import { useCallback, useMemo, useState } from 'react';
 import Button from '@/components/ui/Button';
 import Card from '@/components/ui/Card';
-import { MOCK_MEMBERS } from '@/lib/mockData';
 import { distanceToDiscountPct } from '@/lib/driverDiscount';
+import { useSessions } from '@/hooks/useSessions';
 
 /**
  * 支払い記録 追加/編集画面：
  * 支払い名・立替者・合計金額・割り勘対象（除外トグル）・個別金額指定（任意）。
- * ワイヤーフレームのため計算/保存は行わず、UIと遷移のみ。
+ * 現在のセッションメンバーを実 state から取得して描画する。
+ * 保存処理は Phase 3 で結線するため、本フェーズでは onSave/onCancel で
+ * セッション画面へ戻るのみ（永続化なし）。
  *
  * @param {Object} props
  * @param {(key: string) => string} props.t
  * @param {string|null} props.editPaymentId  編集対象ID（新規時 null）
- * @param {boolean} [props.driverDiscountEnabled=false] 御者割（運転手割）が有効か
- * @param {() => void} props.onSave           セッションへ戻る
- * @param {() => void} props.onCancel         セッションへ戻る
+ * @param {boolean} [props.driverDiscountEnabled=false]
+ * @param {() => void} props.onSave
+ * @param {() => void} props.onCancel
  */
 function PaymentFormScreen({
   t,
@@ -24,15 +26,20 @@ function PaymentFormScreen({
   onSave,
   onCancel,
 }) {
+  const { currentSession } = useSessions();
+  const members = useMemo(
+    () => currentSession?.members ?? [],
+    [currentSession],
+  );
   const isEdit = editPaymentId != null;
 
-  // ローカルUI状態: 割り勘対象に含まれるメンバーIDの集合（配列で保持）
+  // ローカルUI状態: 割り勘対象に含まれるメンバーID（初期は全員対象）
   const [includedIds, setIncludedIds] = useState(() =>
-    MOCK_MEMBERS.map((m) => m.id),
+    members.map((m) => m.id),
   );
 
-  // ローカルUI状態: 御者（運転した仲間）と移動距離（km, 文字列保持）
-  const [coachmanId, setCoachmanId] = useState(MOCK_MEMBERS[0].id);
+  // ローカルUI状態: 御者と移動距離
+  const [coachmanId, setCoachmanId] = useState(() => members[0]?.id ?? '');
   const [distanceKm, setDistanceKm] = useState('');
 
   const handleCoachman = useCallback(
@@ -49,24 +56,21 @@ function PaymentFormScreen({
 
   const coachmanOptions = useMemo(
     () =>
-      MOCK_MEMBERS.map((m) => (
+      members.map((m) => (
         <option key={m.id} value={m.id}>
           {m.name}
         </option>
       )),
-    [],
+    [members],
   );
 
   const discountPct = distanceToDiscountPct(distanceKm);
 
-  // 除外/対象トグル。インライン関数生成を避け data-value で集約。
   const handleToggleMember = useCallback(
     /** @param {React.MouseEvent<HTMLButtonElement>} e */
     (e) => {
       const id = e.currentTarget.dataset.value;
-      if (!id) {
-        return;
-      }
+      if (!id) return;
       setIncludedIds((prev) =>
         prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
       );
@@ -78,10 +82,24 @@ function PaymentFormScreen({
     /** @param {React.FormEvent} e */
     (e) => {
       e.preventDefault();
+      // Phase 3 でフォーム値を集めて patchSession に渡し payments を更新する
       onSave();
     },
     [onSave],
   );
+
+  if (!currentSession) {
+    return (
+      <div className="flex flex-col gap-3">
+        <Button variant="ghost" onClick={onCancel}>
+          ← {t('common.cancel')}
+        </Button>
+        <Card>
+          <p className="app-text-muted text-sm">{t('home.empty')}</p>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <form className="flex flex-col gap-5" onSubmit={handleSubmit}>
@@ -100,7 +118,6 @@ function PaymentFormScreen({
           <input
             type="text"
             placeholder={t('payment.namePlaceholder')}
-            defaultValue={isEdit ? '2次会 / Bar' : ''}
             className="app-card app-field border px-3 py-2"
           />
         </label>
@@ -108,10 +125,10 @@ function PaymentFormScreen({
         <label className="flex flex-col gap-1 text-sm">
           <span className="app-text font-semibold">{t('payment.payer')}</span>
           <select
-            defaultValue={MOCK_MEMBERS[0].id}
+            defaultValue={members[0]?.id ?? ''}
             className="app-card app-field border px-3 py-2"
           >
-            {MOCK_MEMBERS.map((m) => (
+            {members.map((m) => (
               <option key={m.id} value={m.id}>
                 {m.name}
               </option>
@@ -126,7 +143,6 @@ function PaymentFormScreen({
             inputMode="numeric"
             min="0"
             placeholder="0"
-            defaultValue={isEdit ? 12000 : ''}
             className="app-card app-field border px-3 py-2"
           />
         </label>
@@ -137,7 +153,7 @@ function PaymentFormScreen({
           {t('payment.splitTargets')}
         </h3>
         <ul className="flex flex-col gap-2">
-          {MOCK_MEMBERS.map((m) => {
+          {members.map((m) => {
             const included = includedIds.includes(m.id);
             return (
               <li
@@ -164,7 +180,7 @@ function PaymentFormScreen({
         </h3>
         <p className="app-text-muted text-xs">{t('payment.fixedHint')}</p>
         <ul className="flex flex-col gap-2">
-          {MOCK_MEMBERS.map((m) => (
+          {members.map((m) => (
             <li key={m.id} className="flex items-center justify-between gap-3">
               <span className="app-text text-sm">{m.name}</span>
               <input
