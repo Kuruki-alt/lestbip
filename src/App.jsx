@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import AppLayout from '@/components/layout/AppLayout';
 import TopBar from '@/components/layout/TopBar';
 import HomeScreen from '@/components/screens/HomeScreen';
@@ -13,6 +13,7 @@ import { useScreenRouter } from '@/hooks/useScreenRouter';
 import { useDriverDiscount } from '@/hooks/useDriverDiscount';
 import { useCurrency } from '@/hooks/useCurrency';
 import { useSessions } from '@/hooks/useSessions';
+import { decodeSessionFromUrl, encodeSessionToUrl } from '@/lib/share';
 
 /**
  * アプリのルート。
@@ -32,6 +33,7 @@ function App() {
     currentSession,
     openSession: storeOpenSession,
     closeSession,
+    importSession,
   } = useSessions();
 
   // 表示通貨: セッションが開いている時は session.currency、無ければ既定
@@ -72,10 +74,46 @@ function App() {
     [navigate],
   );
 
-  const handleShare = useCallback(() => {
-    // ワイヤーフレーム: URL Base64 シェアは未実装（スコープ外）
-    window.alert(t('session.shareCopied'));
-  }, [t]);
+  const handleShare = useCallback(async () => {
+    if (!currentSession) return;
+    const url = encodeSessionToUrl(currentSession);
+    try {
+      if (
+        typeof navigator !== 'undefined' &&
+        navigator.clipboard &&
+        typeof navigator.clipboard.writeText === 'function'
+      ) {
+        await navigator.clipboard.writeText(url);
+        window.alert(`${t('session.shareCopied')}\n${url}`);
+        return;
+      }
+      // クリップボードAPIが使えない環境はURLをそのまま提示
+      window.prompt(t('session.shareCopied'), url);
+    } catch {
+      window.prompt(t('session.shareError'), url);
+    }
+  }, [currentSession, t]);
+
+  // 初回マウントで ?s=... を取り込んで新セッション化（id 衝突回避のため新規作成）。
+  // URL は綺麗にする（リロード時の二重取り込みを防ぐ）。
+  const importedRef = useRef(false);
+  useEffect(() => {
+    if (importedRef.current) return;
+    importedRef.current = true;
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get('s');
+    if (!token) return;
+    const imported = decodeSessionFromUrl(`?s=${token}`);
+    if (!imported) return;
+    importSession(imported);
+    navigate('session');
+    const cleaned = new URL(window.location.href);
+    cleaned.searchParams.delete('s');
+    window.history.replaceState({}, '', cleaned.toString());
+    // import / navigate は createCallback で安定。effect は一度きり走らせたい。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const topBar = (
     <TopBar
