@@ -15,6 +15,13 @@ export default defineConfig(({ command }) => ({
       '@': fileURLToPath(new URL('./src', import.meta.url)),
     },
   },
+  test: {
+    // Vitest 設定。jsdom 環境で localStorage 等の DOM API を提供
+    environment: 'jsdom',
+    globals: false,
+    include: ['src/**/__tests__/**/*.test.{js,jsx}'],
+    setupFiles: ['./src/lib/__tests__/setup.js'],
+  },
   build: {
     // 本番ソースマップ無効（CLAUDE.md §2-2）
     sourcemap: false,
