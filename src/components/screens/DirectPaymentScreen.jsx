@@ -1,0 +1,174 @@
+import PropTypes from 'prop-types';
+import { useCallback, useMemo, useState } from 'react';
+import Button from '@/components/ui/Button';
+import Card from '@/components/ui/Card';
+import { MOCK_MEMBERS } from '@/lib/mockData';
+
+/**
+ * 個人間の支払い（返済）記録画面：
+ * 「支払う人 → 受け取る人 に 金額」を記録する。割り勘とは別種の記録で、
+ * 履歴に残しつつ全体精算からは差し引く（計算は calculator.js の将来責務）。
+ * ワイヤーフレームのため永続化は行わず、UI と遷移のみ。
+ *
+ * @param {Object} props
+ * @param {(key: string) => string} props.t
+ * @param {() => void} props.onSave    セッションへ戻る
+ * @param {() => void} props.onCancel  セッションへ戻る
+ * @param {() => void} props.onWaive   「いいよいいよ〜^^」金額不問で完遂（免除）
+ */
+function DirectPaymentScreen({ t, onSave, onCancel, onWaive }) {
+  // ローカルUI状態: { fromId, toId, amount }
+  const [fromId, setFromId] = useState(MOCK_MEMBERS[0].id);
+  const [toId, setToId] = useState(MOCK_MEMBERS[1].id);
+  const [amount, setAmount] = useState('');
+
+  const handleFrom = useCallback(
+    /** @param {React.ChangeEvent<HTMLSelectElement>} e */
+    (e) => setFromId(e.target.value),
+    [],
+  );
+
+  const handleTo = useCallback(
+    /** @param {React.ChangeEvent<HTMLSelectElement>} e */
+    (e) => setToId(e.target.value),
+    [],
+  );
+
+  const handleAmount = useCallback(
+    /** @param {React.ChangeEvent<HTMLInputElement>} e */
+    (e) => setAmount(e.target.value),
+    [],
+  );
+
+  const samePerson = fromId === toId;
+  const amountValue = Number(amount);
+  const canSave =
+    !samePerson && Number.isFinite(amountValue) && amountValue > 0;
+
+  const handleSubmit = useCallback(
+    /** @param {React.FormEvent} e */
+    (e) => {
+      e.preventDefault();
+      if (!canSave) {
+        return;
+      }
+      onSave();
+    },
+    [canSave, onSave],
+  );
+
+  // 「いいよいいよ〜^^」: 金額に関わらず完遂（免除）扱い。
+  // 当人同士でないこと（from≠to）だけは満たす必要がある。
+  const handleWaive = useCallback(() => {
+    if (samePerson) {
+      return;
+    }
+    onWaive();
+  }, [samePerson, onWaive]);
+
+  const memberOptions = useMemo(
+    () =>
+      MOCK_MEMBERS.map((m) => (
+        <option key={m.id} value={m.id}>
+          {m.name}
+        </option>
+      )),
+    [],
+  );
+
+  const selectClass = 'app-card app-field border px-3 py-2';
+
+  return (
+    <form className="flex flex-col gap-5" onSubmit={handleSubmit}>
+      <div className="flex items-center justify-between">
+        <Button variant="ghost" onClick={onCancel}>
+          ← {t('common.cancel')}
+        </Button>
+        <h2 className="app-text text-base font-bold">
+          {t('directPayment.title')}
+        </h2>
+      </div>
+
+      <Card className="flex flex-col gap-4">
+        <label className="flex flex-col gap-1 text-sm">
+          <span className="app-text font-semibold">
+            {t('directPayment.from')}
+          </span>
+          <select value={fromId} onChange={handleFrom} className={selectClass}>
+            {memberOptions}
+          </select>
+        </label>
+
+        <div className="app-text-muted text-center text-lg">↓</div>
+
+        <label className="flex flex-col gap-1 text-sm">
+          <span className="app-text font-semibold">
+            {t('directPayment.to')}
+          </span>
+          <select value={toId} onChange={handleTo} className={selectClass}>
+            {memberOptions}
+          </select>
+        </label>
+
+        <label className="flex flex-col gap-1 text-sm">
+          <span className="app-text font-semibold">
+            {t('directPayment.amount')}
+          </span>
+          <input
+            type="number"
+            inputMode="numeric"
+            min="0"
+            value={amount}
+            onChange={handleAmount}
+            placeholder="0"
+            className={selectClass}
+          />
+        </label>
+
+        {samePerson ? (
+          <p className="app-danger-fg text-xs">
+            {t('directPayment.sameWarning')}
+          </p>
+        ) : null}
+      </Card>
+
+      <p className="app-text-muted text-xs">{t('directPayment.deductHint')}</p>
+
+      <div className="flex flex-col gap-1">
+        <Button
+          variant="happy"
+          fullWidth
+          onClick={handleWaive}
+          ariaLabel={t('directPayment.waive')}
+        >
+          {t('directPayment.waive')}
+        </Button>
+        <p className="text-center app-text-muted text-xs">
+          {t('directPayment.waiveHint')}
+        </p>
+      </div>
+
+      <div className="flex gap-3">
+        <Button variant="secondary" fullWidth onClick={onCancel}>
+          {t('common.cancel')}
+        </Button>
+        <Button
+          type="submit"
+          fullWidth
+          variant={canSave ? 'primary' : 'secondary'}
+        >
+          {t('common.save')}
+        </Button>
+      </div>
+    </form>
+  );
+}
+
+DirectPaymentScreen.propTypes = {
+  t: PropTypes.func.isRequired,
+  onSave: PropTypes.func.isRequired,
+  onCancel: PropTypes.func.isRequired,
+  onWaive: PropTypes.func.isRequired,
+};
+
+export default DirectPaymentScreen;

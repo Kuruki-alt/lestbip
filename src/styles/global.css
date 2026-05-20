@@ -1,0 +1,198 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+ * テーマトークン（CSS変数 / CLAUDE.md §6）。
+ * 採用デザイン:
+ *  - [data-theme='simple']（ライト）= 妖精の泉
+ *  - [data-theme='pop']（ライト）   = 草原ステージ（ピクセルフォント）
+ *  - .dark（colorMode=dark）        = 密林の天蓋（simple/pop 共通で上書き）
+ * 配色は彩度・コントラストを調整し「色のぶつかり」を抑え可読性を優先。
+ * 色は全てセマンティッククラス(.app-*)経由で参照し、Tailwind の生の
+ * 配色ユーティリティ・dark: 変種はコンポーネントから排除する。
+ */
+:root {
+  --c-bg: #eef6f2;
+  --c-surface: #ffffff;
+  --c-surface-2: #e3f1ec;
+  --c-border: #cfe3da;
+  --c-text: #1c3a33;
+  --c-text-muted: #5b7d74;
+  --c-accent: #2f9e87;
+  --c-accent-text: #ffffff;
+  --c-accent-soft: #d8efe7;
+  --c-accent-soft-text: #1f5a4c;
+  --c-danger: #c75d6a;
+  --c-danger-text: #ffffff;
+  --c-happy: #e0a23a;
+  --c-happy-text: #3a2a05;
+  --c-radius: 16px;
+  --c-shadow: 0 6px 16px rgba(47, 158, 135, 0.14);
+  --c-font: system-ui, Avenir, Helvetica, Arial, sans-serif;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: var(--c-font);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* シンプル = 妖精の泉（ライト・若葉と水色・柔らかな丸み） */
+[data-theme='simple'] {
+  --c-bg: #eef6f2;
+  --c-surface: #ffffff;
+  --c-surface-2: #e1f0ea;
+  --c-border: #c9e2d8;
+  --c-text: #1c3a33;
+  --c-text-muted: #5d7f76;
+  --c-accent: #2f9e87;
+  --c-accent-text: #ffffff;
+  --c-accent-soft: #d8efe7;
+  --c-accent-soft-text: #1f5a4c;
+  --c-danger: #c75d6a;
+  --c-danger-text: #ffffff;
+  --c-happy: #d8973a;
+  --c-happy-text: #2f2103;
+  --c-radius: 16px;
+  --c-shadow: 0 6px 16px rgba(47, 158, 135, 0.14);
+  --c-font: system-ui, Avenir, Helvetica, Arial, sans-serif;
+}
+
+/* ポップ = 草原ステージ（ライト・空色×草原・ピクセルフォント） */
+[data-theme='pop'] {
+  --c-bg: #d6eef7;
+  --c-surface: #ffffff;
+  --c-surface-2: #e6f3dc;
+  --c-border: #a9cfe0;
+  --c-text: #173a22;
+  --c-text-muted: #4f7a57;
+  --c-accent: #2fa84f;
+  --c-accent-text: #ffffff;
+  --c-accent-soft: #ddefce;
+  --c-accent-soft-text: #1f5a2c;
+  --c-danger: #d65a52;
+  --c-danger-text: #ffffff;
+  --c-happy: #f2c14e;
+  --c-happy-text: #3a2e05;
+  --c-radius: 6px;
+  --c-shadow: 3px 3px 0 rgba(23, 58, 34, 0.16);
+  --c-font: 'Press Start 2P', 'Courier New', ui-monospace, monospace;
+}
+
+/* ポップのピクセルフォントは大きいため、root font-size を縮小して
+ * rem 基準の Tailwind サイズを全体的に小さくし可読性を上げる。
+ * ダーク（密林の天蓋）時は通常フォントに戻るため、この縮小は適用しない。 */
+[data-theme='pop']:not(.dark) {
+  font-size: 13px;
+}
+[data-theme='pop']:not(.dark) body {
+  letter-spacing: 0.01em;
+  line-height: 1.7;
+}
+
+/* ダーク = 密林の天蓋（simple/pop どちらでも dark 時はこれで上書き） */
+.dark {
+  --c-bg: #0d2417;
+  --c-surface: #143324;
+  --c-surface-2: #1b4030;
+  --c-border: #2c5a3e;
+  --c-text: #dff0e2;
+  --c-text-muted: #8fb59b;
+  --c-accent: #34c46e;
+  --c-accent-text: #06180d;
+  --c-accent-soft: #1d4a32;
+  --c-accent-soft-text: #bfe9cc;
+  --c-danger: #e3897b;
+  --c-danger-text: #1a0f0c;
+  --c-happy: #e8b24a;
+  --c-happy-text: #241803;
+  --c-radius: 14px;
+  --c-shadow: 0 0 16px rgba(52, 196, 110, 0.22);
+  --c-font: system-ui, Avenir, Helvetica, Arial, sans-serif;
+}
+
+/* ===== セマンティッククラス（全コンポーネントはこれ経由で配色） ===== */
+.app-bg {
+  background: var(--c-bg);
+  color: var(--c-text);
+}
+.app-surface {
+  background: var(--c-surface);
+  border-color: var(--c-border);
+  color: var(--c-text);
+}
+.app-surface-2 {
+  background: var(--c-surface-2);
+  color: var(--c-text);
+}
+.app-text {
+  color: var(--c-text);
+}
+.app-text-muted {
+  color: var(--c-text-muted);
+}
+.app-border {
+  border-color: var(--c-border);
+}
+.app-accent {
+  background: var(--c-accent);
+  color: var(--c-accent-text);
+}
+.app-accent-soft {
+  background: var(--c-accent-soft);
+  color: var(--c-accent-soft-text);
+}
+.app-accent-fg {
+  color: var(--c-accent);
+}
+.app-danger-fg {
+  color: var(--c-danger);
+}
+.app-danger {
+  background: var(--c-danger);
+  color: var(--c-danger-text);
+}
+.app-happy {
+  background: var(--c-happy);
+  color: var(--c-happy-text);
+}
+.app-ghost {
+  background: transparent;
+  color: var(--c-text);
+}
+.app-field {
+  background: var(--c-surface);
+  color: var(--c-text);
+  border-color: var(--c-border);
+}
+.app-accent:hover,
+.app-danger:hover,
+.app-happy:hover {
+  filter: brightness(0.95);
+}
+.app-ghost:hover,
+.app-surface-2:hover {
+  filter: brightness(0.97);
+}
+.app-field:focus,
+.app-field:focus-visible {
+  outline: none;
+  border-color: var(--c-accent);
+}
+:focus-visible {
+  outline: 2px solid var(--c-accent);
+  outline-offset: 2px;
+}
+
+/* 角丸・影は系統トークンで一括（CLAUDE.md §6） */
+.app-card {
+  border-radius: var(--c-radius);
+  box-shadow: var(--c-shadow);
+}
