@@ -1,5 +1,5 @@
 import PropTypes from 'prop-types';
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import Button from '@/components/ui/Button';
 import Card from '@/components/ui/Card';
 import { formatAmount } from '@/lib/currency';
@@ -32,7 +32,9 @@ function SessionScreen({
   onViewSettlement,
   onShare,
 }) {
-  const { currentSession, patchSession } = useSessions();
+  const { currentSession, patchSession, addMember } = useSessions();
+  // メンバー後追加用の入力
+  const [draftMember, setDraftMember] = useState('');
 
   // 派生配列を useMemo で安定化（参照変化による不要な再計算を防ぐ）
   const members = useMemo(
@@ -94,6 +96,30 @@ function SessionScreen({
     [currentSession, directPayments, patchSession],
   );
 
+  const handleDraftMember = useCallback(
+    /** @param {React.ChangeEvent<HTMLInputElement>} e */
+    (e) => setDraftMember(e.target.value),
+    [],
+  );
+
+  const handleAddMember = useCallback(() => {
+    const name = draftMember.trim();
+    if (!name || !currentSession) return;
+    addMember(currentSession.id, name);
+    setDraftMember('');
+  }, [draftMember, currentSession, addMember]);
+
+  const handleMemberKeyDown = useCallback(
+    /** @param {React.KeyboardEvent<HTMLInputElement>} e */
+    (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        handleAddMember();
+      }
+    },
+    [handleAddMember],
+  );
+
   // セッション未選択時の保険（通常は App ルーターがホームに戻すが念のため）
   if (!currentSession) {
     return (
@@ -119,7 +145,7 @@ function SessionScreen({
         </Button>
       </div>
 
-      <Card className="flex flex-col gap-2">
+      <Card className="flex flex-col gap-3">
         <h2 className="app-text text-lg font-bold">{currentSession.name}</h2>
         <div className="flex flex-wrap gap-2">
           {members.length === 0 ? (
@@ -136,6 +162,20 @@ function SessionScreen({
               </span>
             ))
           )}
+        </div>
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={draftMember}
+            onChange={handleDraftMember}
+            onKeyDown={handleMemberKeyDown}
+            placeholder={t('newSession.memberPlaceholder')}
+            aria-label={t('session.addMember')}
+            className="app-card app-field min-w-0 flex-1 border px-3 py-1.5 text-sm"
+          />
+          <Button variant="secondary" onClick={handleAddMember}>
+            + {t('session.addMember')}
+          </Button>
         </div>
       </Card>
 

@@ -3,18 +3,17 @@ import { useCallback, useMemo, useState } from 'react';
 import Button from '@/components/ui/Button';
 import Card from '@/components/ui/Card';
 import { distanceToDiscountPct } from '@/lib/driverDiscount';
+import { genId } from '@/lib/ids';
 import { useSessions } from '@/hooks/useSessions';
 
 /**
- * 支払い記録 追加/編集画面：
- * 支払い名・立替者・合計金額・割り勘対象（除外トグル）・個別金額指定（任意）。
- * 現在のセッションメンバーを実 state から取得して描画する。
- * 保存処理は Phase 3 で結線するため、本フェーズでは onSave/onCancel で
- * セッション画面へ戻るのみ（永続化なし）。
+ * 支払い記録 追加/編集画面（Phase 3：保存処理を結線）。
+ * 制御フォーム。編集時は currentSession.payments から該当 Payment を読み込み、
+ * 保存時は patchSession で payments 配列を更新する。
  *
  * @param {Object} props
  * @param {(key: string) => string} props.t
- * @param {string|null} props.editPaymentId  編集対象ID（新規時 null）
+ * @param {string|null} props.editPaymentId
  * @param {boolean} [props.driverDiscountEnabled=false]
  * @param {() => void} props.onSave
  * @param {() => void} props.onCancel
@@ -26,31 +25,106 @@ function PaymentFormScreen({
   onSave,
   onCancel,
 }) {
-  const { currentSession } = useSessions();
+  const { currentSession, patchSession } = useSessions();
   const members = useMemo(
     () => currentSession?.members ?? [],
     [currentSession],
   );
-  const isEdit = editPaymentId != null;
+  const payments = useMemo(
+    () => currentSession?.payments ?? [],
+    [currentSession],
+  );
+  const editingPayment = useMemo(
+    () =>
+      editPaymentId
+        ? (payments.find((p) => p.id === editPaymentId) ?? null)
+        : null,
+    [editPaymentId, payments],
+  );
+  const isEdit = editingPayment != null;
 
-  // ローカルUI状態: 割り勘対象に含まれるメンバーID（初期は全員対象）
-  const [includedIds, setIncludedIds] = useState(() =>
-    members.map((m) => m.id),
+  // 制御フォームの初期値（編集時は対象 Payment から復元、新規時は既定）
+  const [name, setName] = useState(editingPayment?.name ?? '');
+  const [payerId, setPayerId] = useState(
+    editingPayment?.payerId ?? members[0]?.id ?? '',
+  );
+  const [total, setTotal] = useState(
+    editingPayment?.total != null ? String(editingPayment.total) : '',
+  );
+  const [includedIds, setIncludedIds] = useState(() => {
+    if (editingPayment) {
+      const excluded = new Set(editingPayment.excludedMemberIds ?? []);
+      return members.filter((m) => !excluded.has(m.id)).map((m) => m.id);
+    }
+    return members.map((m) => m.id);
+  });
+  // 動的キー（memberId）アクセスを避けるため Map で保持
+  const [fixedAmountMap, setFixedAmountMap] = useState(
+    () => new Map(Object.entries(editingPayment?.fixedAmounts ?? {})),
+  );
+  const [coachmanId, setCoachmanId] = useState(
+    editingPayment?.coachmanId ?? members[0]?.id ?? '',
+  );
+  const [distanceKm, setDistanceKm] = useState(
+    editingPayment?.distanceKm != null ? String(editingPayment.distanceKm) : '',
   );
 
-  // ローカルUI状態: 御者と移動距離
-  const [coachmanId, setCoachmanId] = useState(() => members[0]?.id ?? '');
-  const [distanceKm, setDistanceKm] = useState('');
-
+  const handleName = useCallback(
+    /** @param {React.ChangeEvent<HTMLInputElement>} e */
+    (e) => setName(e.target.value),
+    [],
+  );
+  const handlePayer = useCallback(
+    /** @param {React.ChangeEvent<HTMLSelectElement>} e */
+    (e) => setPayerId(e.target.value),
+    [],
+  );
+  const handleTotal = useCallback(
+    /** @param {React.ChangeEvent<HTMLInputElement>} e */
+    (e) => setTotal(e.target.value),
+    [],
+  );
   const handleCoachman = useCallback(
     /** @param {React.ChangeEvent<HTMLSelectElement>} e */
     (e) => setCoachmanId(e.target.value),
     [],
   );
-
   const handleDistance = useCallback(
     /** @param {React.ChangeEvent<HTMLInputElement>} e */
     (e) => setDistanceKm(e.target.value),
+    [],
+  );
+
+  const handleToggleMember = useCallback(
+    /** @param {React.MouseEvent<HTMLButtonElement>} e */
+    (e) => {
+      const id = e.currentTarget.dataset.value;
+      if (!id) return;
+      setIncludedIds((prev) =>
+        prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
+      );
+    },
+    [],
+  );
+
+  // 個別金額: 0/空/非数値は未設定扱い（Map から削除）
+  const handleFixedAmount = useCallback(
+    /** @param {React.ChangeEvent<HTMLInputElement>} e */
+    (e) => {
+      const id = e.currentTarget.dataset.value;
+      const raw = e.currentTarget.value;
+      if (!id) return;
+      setFixedAmountMap((prev) => {
+        const next = new Map(prev);
+        const n = Number(raw);
+        if (raw === '' || !Number.isFinite(n) || n <= 0) {
+          next.delete(id);
+        } else {
+          next.set(id, n);
+        }
+        return next;
+      });
+    },
     [],
   );
 
@@ -66,26 +140,60 @@ function PaymentFormScreen({
 
   const discountPct = distanceToDiscountPct(distanceKm);
 
-  const handleToggleMember = useCallback(
-    /** @param {React.MouseEvent<HTMLButtonElement>} e */
-    (e) => {
-      const id = e.currentTarget.dataset.value;
-      if (!id) return;
-      setIncludedIds((prev) =>
-        prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
-      );
-    },
-    [],
-  );
+  const totalNum = Number(total);
+  const canSave =
+    name.trim().length > 0 &&
+    !!payerId &&
+    Number.isFinite(totalNum) &&
+    totalNum > 0 &&
+    includedIds.length > 0;
 
   const handleSubmit = useCallback(
     /** @param {React.FormEvent} e */
     (e) => {
       e.preventDefault();
-      // Phase 3 でフォーム値を集めて patchSession に渡し payments を更新する
+      if (!canSave || !currentSession) return;
+      const excludedMemberIds = members
+        .filter((m) => !includedIds.includes(m.id))
+        .map((m) => m.id);
+      /** @type {import('@/lib/calculator').Payment} */
+      const payment = {
+        id: editingPayment?.id ?? genId('p'),
+        name: name.trim(),
+        payerId,
+        total: totalNum,
+        excludedMemberIds,
+        fixedAmounts: Object.fromEntries(fixedAmountMap),
+      };
+      const distNum = Number(distanceKm);
+      if (driverDiscountEnabled && coachmanId && distNum > 0) {
+        payment.coachmanId = coachmanId;
+        payment.distanceKm = distNum;
+      }
+      const nextPayments = isEdit
+        ? payments.map((p) => (p.id === payment.id ? payment : p))
+        : [...payments, payment];
+      patchSession(currentSession.id, { payments: nextPayments });
       onSave();
     },
-    [onSave],
+    [
+      canSave,
+      currentSession,
+      members,
+      includedIds,
+      editingPayment,
+      name,
+      payerId,
+      totalNum,
+      fixedAmountMap,
+      driverDiscountEnabled,
+      coachmanId,
+      distanceKm,
+      isEdit,
+      payments,
+      patchSession,
+      onSave,
+    ],
   );
 
   if (!currentSession) {
@@ -117,6 +225,8 @@ function PaymentFormScreen({
           <span className="app-text font-semibold">{t('payment.name')}</span>
           <input
             type="text"
+            value={name}
+            onChange={handleName}
             placeholder={t('payment.namePlaceholder')}
             className="app-card app-field border px-3 py-2"
           />
@@ -125,7 +235,8 @@ function PaymentFormScreen({
         <label className="flex flex-col gap-1 text-sm">
           <span className="app-text font-semibold">{t('payment.payer')}</span>
           <select
-            defaultValue={members[0]?.id ?? ''}
+            value={payerId}
+            onChange={handlePayer}
             className="app-card app-field border px-3 py-2"
           >
             {members.map((m) => (
@@ -142,6 +253,8 @@ function PaymentFormScreen({
             type="number"
             inputMode="numeric"
             min="0"
+            value={total}
+            onChange={handleTotal}
             placeholder="0"
             className="app-card app-field border px-3 py-2"
           />
@@ -187,7 +300,11 @@ function PaymentFormScreen({
                 type="number"
                 inputMode="numeric"
                 min="0"
+                value={fixedAmountMap.get(m.id) ?? ''}
+                data-value={m.id}
+                onChange={handleFixedAmount}
                 placeholder="-"
+                aria-label={`${t('payment.fixedAmounts')} ${m.name}`}
                 className="app-card app-field w-28 border px-3 py-1.5 text-right"
               />
             </li>
@@ -246,10 +363,19 @@ function PaymentFormScreen({
         <Button variant="secondary" fullWidth onClick={onCancel}>
           {t('common.cancel')}
         </Button>
-        <Button type="submit" fullWidth>
+        <Button
+          type="submit"
+          fullWidth
+          variant={canSave ? 'primary' : 'secondary'}
+        >
           {t('common.save')}
         </Button>
       </div>
+      {!canSave ? (
+        <p className="app-text-muted text-center text-xs">
+          {t('payment.saveHint')}
+        </p>
+      ) : null}
     </form>
   );
 }
