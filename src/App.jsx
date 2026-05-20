@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import AppLayout from '@/components/layout/AppLayout';
 import TopBar from '@/components/layout/TopBar';
 import HomeScreen from '@/components/screens/HomeScreen';
@@ -14,6 +14,26 @@ import { useDriverDiscount } from '@/hooks/useDriverDiscount';
 import { useCurrency } from '@/hooks/useCurrency';
 import { useSessions } from '@/hooks/useSessions';
 import { decodeSessionFromUrl, encodeSessionToUrl } from '@/lib/share';
+import { loadPrefs, savePrefs } from '@/lib/storage';
+
+/** 不正値（壊れた LocalStorage 等）を弾くためのホワイトリスト集 */
+const VALID_LANGS = new Set(['ja', 'en']);
+const VALID_FAMILY = new Set(['simple', 'pop']);
+const VALID_COLOR = new Set(['light', 'dark']);
+const VALID_CURRENCY = new Set(['JPY', 'USD', 'EUR', 'CAD']);
+
+/** prefs から各フィールドを取り出してホワイトリスト検証する */
+function pickPrefs(p) {
+  const safe = p ?? {};
+  return {
+    lang: VALID_LANGS.has(safe.lang) ? safe.lang : 'ja',
+    family: VALID_FAMILY.has(safe.family) ? safe.family : 'simple',
+    colorMode: VALID_COLOR.has(safe.colorMode) ? safe.colorMode : 'light',
+    currency: VALID_CURRENCY.has(safe.currency) ? safe.currency : 'JPY',
+    driverDiscount:
+      typeof safe.driverDiscount === 'boolean' ? safe.driverDiscount : false,
+  };
+}
 
 /**
  * アプリのルート。
@@ -22,13 +42,33 @@ import { decodeSessionFromUrl, encodeSessionToUrl } from '@/lib/share';
  * - useI18n で日本語/英語ラベルを切替
  */
 function App() {
-  const { t, lang, setLang } = useI18n('ja');
-  const { family, colorMode, setFamily, setColorMode } = useTheme();
+  // 初回マウント時に LocalStorage から表示設定を読み込み、各 use* フックの
+  // 初期値として渡す（要件 §5.2 末尾：テーマ等を次回も維持）。
+  const initialPrefs = useMemo(() => pickPrefs(loadPrefs()), []);
+
+  const { t, lang, setLang } = useI18n(initialPrefs.lang);
+  const { family, colorMode, setFamily, setColorMode } = useTheme({
+    family: initialPrefs.family,
+    colorMode: initialPrefs.colorMode,
+  });
   const { screen, editPaymentId, navigate } = useScreenRouter();
   // オプション機能のため既定は無効
   const { enabled: driverDiscount, setEnabled: setDriverDiscount } =
-    useDriverDiscount(false);
-  const { currency: defaultCurrency, setCurrency } = useCurrency('JPY');
+    useDriverDiscount(initialPrefs.driverDiscount);
+  const { currency: defaultCurrency, setCurrency } = useCurrency(
+    initialPrefs.currency,
+  );
+
+  // 設定が変わるたびに LocalStorage へ反映（部分マージ）。
+  useEffect(() => {
+    savePrefs({
+      lang,
+      family,
+      colorMode,
+      currency: defaultCurrency,
+      driverDiscount,
+    });
+  }, [lang, family, colorMode, defaultCurrency, driverDiscount]);
   const {
     currentSession,
     openSession: storeOpenSession,
