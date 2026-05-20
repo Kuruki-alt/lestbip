@@ -2,6 +2,7 @@ import PropTypes from 'prop-types';
 import { useCallback, useMemo, useState } from 'react';
 import Button from '@/components/ui/Button';
 import Card from '@/components/ui/Card';
+import { genId } from '@/lib/ids';
 import { useSessions } from '@/hooks/useSessions';
 
 /**
@@ -17,9 +18,13 @@ import { useSessions } from '@/hooks/useSessions';
  * @param {() => void} props.onWaive   「いいよいいよ〜^^」金額不問で完遂（免除）
  */
 function DirectPaymentScreen({ t, onSave, onCancel, onWaive }) {
-  const { currentSession } = useSessions();
+  const { currentSession, patchSession } = useSessions();
   const members = useMemo(
     () => currentSession?.members ?? [],
+    [currentSession],
+  );
+  const directPayments = useMemo(
+    () => currentSession?.directPayments ?? [],
     [currentSession],
   );
 
@@ -57,22 +62,59 @@ function DirectPaymentScreen({ t, onSave, onCancel, onWaive }) {
     /** @param {React.FormEvent} e */
     (e) => {
       e.preventDefault();
-      if (!canSave) {
-        return;
-      }
+      if (!canSave || !currentSession) return;
+      /** @type {import('@/lib/calculator').DirectPayment} */
+      const dp = {
+        id: genId('d'),
+        fromId,
+        toId,
+        amount: amountValue,
+      };
+      patchSession(currentSession.id, {
+        directPayments: [...directPayments, dp],
+      });
       onSave();
     },
-    [canSave, onSave],
+    [
+      canSave,
+      currentSession,
+      directPayments,
+      fromId,
+      toId,
+      amountValue,
+      patchSession,
+      onSave,
+    ],
   );
 
-  // 「いいよいいよ〜^^」: 金額に関わらず完遂（免除）扱い。
-  // 当人同士でないこと（from≠to）だけは満たす必要がある。
+  // 「いいよ！」: 金額不問で完遂（免除）扱い。
+  // 当人同士は不可（from≠to）。amount は入力値（空なら 0）を記録する。
   const handleWaive = useCallback(() => {
-    if (samePerson) {
-      return;
-    }
+    if (samePerson || !currentSession) return;
+    const waivedAmount =
+      Number.isFinite(amountValue) && amountValue > 0 ? amountValue : 0;
+    /** @type {import('@/lib/calculator').DirectPayment} */
+    const dp = {
+      id: genId('d'),
+      fromId,
+      toId,
+      amount: waivedAmount,
+      waived: true,
+    };
+    patchSession(currentSession.id, {
+      directPayments: [...directPayments, dp],
+    });
     onWaive();
-  }, [samePerson, onWaive]);
+  }, [
+    samePerson,
+    currentSession,
+    directPayments,
+    fromId,
+    toId,
+    amountValue,
+    patchSession,
+    onWaive,
+  ]);
 
   const memberOptions = useMemo(
     () =>
