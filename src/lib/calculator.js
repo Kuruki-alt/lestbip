@@ -8,9 +8,11 @@
  *  - 御者割（オプション）: 10km につき 1% で御者の負担を軽減。
  *    全体（セッション）設定が各支払いより優先。
  *  - 個人間支払い（返済）を全体集計から差し引き、最小送金リストは差し引き後で算出。
- *  - 「いいよ！」(waived) は完全免除：from の現時点の負債 (burdens - paid) を
- *    paid 側に積み増して net を 0 まで戻す。to への追加負担計上は行わない
- *    （v3.0.0 改修案 #3）。
+ *  - 「いいよ！」(waived) の挙動 (v3.0.0 #3 + v3.0.1 補正):
+ *    - amount=0: 完全免除。from の現時点の負債 (burdens - paid) を paid 側に
+ *      積み増し net を 0 まで戻す。to / 他メンバーには波及しない。
+ *    - amount>0: 部分免除。from は実質 Y のみ負担し、差額 (D - Y) を from を
+ *      除く他メンバー全員 (to 含む) で等分負担する。
  *
  * @typedef {Object} Member
  * @property {string} id
@@ -255,17 +257,34 @@ export function calculateSettlement(session) {
     roundingDiff += (Number(p.total) || 0) - sumAlloc;
   }
 
-  // 個人間支払いの反映（v3.0.0 改修案 #3）：
+  // 個人間支払いの反映（v3.0.0 #3 + v3.0.1 補正）:
   // - 通常 (waived=false): paid[from]+=amount, burdens[to]+=amount で資金移動を反映
-  // - waived=true:         完全免除。from の現時点の負債 (burdens - paid) を
-  //   paid[from] に積み増し net を 0 まで戻す。to への計上は行わない（負債を
-  //   to が肩代わりするわけではなく、全体支払いから消える挙動）。
+  // - waived=true & amount=0: 完全免除。from の負債を paid 積み増しで 0 まで戻すだけ
+  // - waived=true & amount>0: 部分免除。from は Y のみ負担、差額 (D - Y) を
+  //   from を除く他メンバー全員で等分負担 (burdens に加算)
   for (const d of directs) {
     if (d.waived) {
       if (!paid.has(d.fromId) || !burdens.has(d.fromId)) continue;
       const debt = getNum(burdens, d.fromId, 0) - getNum(paid, d.fromId, 0);
-      if (debt > EPSILON) {
+      if (debt <= EPSILON) continue; // 既に黒字・収支ゼロなら何もしない
+      const enteredAmt = Number(d.amount) || 0;
+      if (enteredAmt <= EPSILON) {
+        // 金額未入力の「いいよ！」: from の負債を 0 まで戻すだけ
         paid.set(d.fromId, getNum(paid, d.fromId, 0) + debt);
+        continue;
+      }
+      // 金額入力ありの「いいよ！」: from は Y のみ負担、差額を他で等分負担
+      const y = Math.min(enteredAmt, debt);
+      const remainder = debt - y;
+      if (remainder > EPSILON) {
+        paid.set(d.fromId, getNum(paid, d.fromId, 0) + remainder);
+        const others = members.filter((m) => m?.id && m.id !== d.fromId);
+        if (others.length > 0) {
+          const perHead = remainder / others.length;
+          for (const m of others) {
+            burdens.set(m.id, getNum(burdens, m.id, 0) + perHead);
+          }
+        }
       }
       continue;
     }
