@@ -245,11 +245,7 @@ function SessionScreen({
                   ) : null}
                 </div>
                 <div className="flex shrink-0 items-center gap-2">
-                  <span
-                    className={`font-semibold ${
-                      d.waived ? 'app-text-muted line-through' : 'app-accent-fg'
-                    }`}
-                  >
+                  <span className="app-accent-fg font-semibold">
                     {formatAmount(d.amount, currency, lang)}
                   </span>
                   <Button
