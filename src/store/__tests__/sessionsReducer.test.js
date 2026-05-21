@@ -93,6 +93,31 @@ describe('sessionsReducer', () => {
     expect(s3.sessions[0].members).toEqual([]);
   });
 
+  it('UPSERT_SESSION は同 id があれば上書き、無ければ追加し current に', () => {
+    // 上書きケース
+    const s1 = sessionsReducer(INITIAL_STATE, {
+      type: 'CREATE_SESSION',
+      session: makeSession('s-1', '旧', {
+        updatedAt: '2020-01-01T00:00:00.000Z',
+      }),
+    });
+    const s2 = sessionsReducer(s1, {
+      type: 'UPSERT_SESSION',
+      session: makeSession('s-1', '新'),
+    });
+    expect(s2.sessions).toHaveLength(1);
+    expect(s2.sessions[0].name).toBe('新');
+    expect(s2.currentSessionId).toBe('s-1');
+
+    // 追加ケース
+    const s3 = sessionsReducer(s2, {
+      type: 'UPSERT_SESSION',
+      session: makeSession('s-2', 'X'),
+    });
+    expect(s3.sessions).toHaveLength(2);
+    expect(s3.currentSessionId).toBe('s-2');
+  });
+
   it('PATCH_SESSION で部分更新できる', () => {
     const s1 = sessionsReducer(INITIAL_STATE, {
       type: 'CREATE_SESSION',
