@@ -1,5 +1,5 @@
 import PropTypes from 'prop-types';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo } from 'react';
 import Button from '@/components/ui/Button';
 import Card from '@/components/ui/Card';
 import SegmentedToggle from '@/components/ui/SegmentedToggle';
@@ -9,9 +9,10 @@ import { calculateSettlement } from '@/lib/calculator';
 import { useSessions } from '@/hooks/useSessions';
 
 /**
- * セッション画面（メイン）：
+ * セッション画面（メイン、v2.0.0 改善案 #2）：
  * セッション名・メンバー、支払い記録一覧（追加/編集/削除）、
  * 精算結果サマリー（calculator でライブ算出）、URLシェアボタン。
+ * メンバー追加・削除は MembersScreen へ分離（「メンバー編集へ」ボタンで遷移）。
  *
  * @param {Object} props
  * @param {(key: string) => string} props.t
@@ -20,6 +21,7 @@ import { useSessions } from '@/hooks/useSessions';
  * @param {() => void} props.onBack
  * @param {(paymentId: string|null) => void} props.onEditPayment
  * @param {() => void} props.onAddDirectPayment
+ * @param {() => void} props.onEditMembers       メンバー編集画面へ
  * @param {() => void} props.onViewSettlement
  * @param {() => void} props.onShare
  */
@@ -30,12 +32,11 @@ function SessionScreen({
   onBack,
   onEditPayment,
   onAddDirectPayment,
+  onEditMembers,
   onViewSettlement,
   onShare,
 }) {
-  const { currentSession, patchSession, addMember } = useSessions();
-  // メンバー後追加用の入力
-  const [draftMember, setDraftMember] = useState('');
+  const { currentSession, patchSession } = useSessions();
 
   // 派生配列を useMemo で安定化（参照変化による不要な再計算を防ぐ）
   const members = useMemo(
@@ -95,30 +96,6 @@ function SessionScreen({
       });
     },
     [currentSession, directPayments, patchSession],
-  );
-
-  const handleDraftMember = useCallback(
-    /** @param {React.ChangeEvent<HTMLInputElement>} e */
-    (e) => setDraftMember(e.target.value),
-    [],
-  );
-
-  const handleAddMember = useCallback(() => {
-    const name = draftMember.trim();
-    if (!name || !currentSession) return;
-    addMember(currentSession.id, name);
-    setDraftMember('');
-  }, [draftMember, currentSession, addMember]);
-
-  const handleMemberKeyDown = useCallback(
-    /** @param {React.KeyboardEvent<HTMLInputElement>} e */
-    (e) => {
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        handleAddMember();
-      }
-    },
-    [handleAddMember],
   );
 
   // 端数処理モード切替（要件 §3.6）
@@ -200,20 +177,9 @@ function SessionScreen({
             ))
           )}
         </div>
-        <div className="flex gap-2">
-          <input
-            type="text"
-            value={draftMember}
-            onChange={handleDraftMember}
-            onKeyDown={handleMemberKeyDown}
-            placeholder={t('newSession.memberPlaceholder')}
-            aria-label={t('session.addMember')}
-            className="app-card app-field min-w-0 flex-1 border px-3 py-1.5 text-sm"
-          />
-          <Button variant="secondary" onClick={handleAddMember}>
-            + {t('session.addMember')}
-          </Button>
-        </div>
+        <Button variant="secondary" fullWidth onClick={onEditMembers}>
+          {t('session.editMembers')} →
+        </Button>
       </Card>
 
       <Card className="flex flex-col gap-3">
@@ -407,6 +373,7 @@ SessionScreen.propTypes = {
   onBack: PropTypes.func.isRequired,
   onEditPayment: PropTypes.func.isRequired,
   onAddDirectPayment: PropTypes.func.isRequired,
+  onEditMembers: PropTypes.func.isRequired,
   onViewSettlement: PropTypes.func.isRequired,
   onShare: PropTypes.func.isRequired,
 };

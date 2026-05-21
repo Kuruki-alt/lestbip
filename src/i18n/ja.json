@@ -20,6 +20,8 @@
 
   "lang.label": "言語",
 
+  "members.title": "メンバー編集",
+
   "driver.label": "御者割",
   "driver.off": "なし",
   "driver.on": "あり",
@@ -45,6 +47,7 @@
   "session.paymentsEmpty": "まだ出費の記録はありません",
   "session.addPayment": "出費をつける",
   "session.addMember": "仲間を追加",
+  "session.editMembers": "メンバー編集へ",
   "session.summary": "山分けのみとおし",
   "session.summaryEmpty": "送金の必要はまだありません",
   "session.viewSettlement": "山分けをくわしく",

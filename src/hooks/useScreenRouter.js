@@ -1,7 +1,7 @@
 import { useCallback, useReducer } from 'react';
 
 /**
- * @typedef {'home' | 'newSession' | 'session' | 'paymentForm' | 'directPayment' | 'settlement'} ScreenName
+ * @typedef {'home' | 'newSession' | 'session' | 'members' | 'paymentForm' | 'directPayment' | 'settlement'} ScreenName
  */
 
 /**
@@ -33,7 +33,7 @@ function routerReducer(state, action) {
 
 /**
  * react-router を使わない簡易画面ルーター（useReducer ベース）。
- * 6画面（home / newSession / session / paymentForm / directPayment / settlement）の相互遷移を担う。
+ * 7画面（home / newSession / session / members / paymentForm / directPayment / settlement）の相互遷移を担う。
  */
 export function useScreenRouter() {
   const [state, dispatch] = useReducer(routerReducer, INITIAL_STATE);

@@ -7,6 +7,7 @@ import SessionScreen from '@/components/screens/SessionScreen';
 import PaymentFormScreen from '@/components/screens/PaymentFormScreen';
 import DirectPaymentScreen from '@/components/screens/DirectPaymentScreen';
 import SettlementScreen from '@/components/screens/SettlementScreen';
+import MembersScreen from '@/components/screens/MembersScreen';
 import { useI18n } from '@/hooks/useI18n';
 import { useTheme } from '@/hooks/useTheme';
 import { useScreenRouter } from '@/hooks/useScreenRouter';
@@ -96,6 +97,7 @@ function App() {
     () => navigate('directPayment'),
     [navigate],
   );
+  const goMembers = useCallback(() => navigate('members'), [navigate]);
 
   const openSession = useCallback(
     /** @param {string} id */
@@ -190,10 +192,13 @@ function App() {
         onBack={goHome}
         onEditPayment={editPayment}
         onAddDirectPayment={goDirectPayment}
+        onEditMembers={goMembers}
         onViewSettlement={goSettlement}
         onShare={handleShare}
       />
     );
+  } else if (screen === 'members') {
+    body = <MembersScreen t={t} onBack={goSession} />;
   } else if (screen === 'paymentForm') {
     body = (
       <PaymentFormScreen

@@ -20,6 +20,8 @@
 
   "lang.label": "Language",
 
+  "members.title": "Edit members",
+
   "driver.label": "Driver discount",
   "driver.off": "Off",
   "driver.on": "On",
@@ -45,6 +47,7 @@
   "session.paymentsEmpty": "No payments yet",
   "session.addPayment": "Add payment",
   "session.addMember": "Add member",
+  "session.editMembers": "Edit members",
   "session.summary": "Settlement summary",
   "session.summaryEmpty": "No transfers needed yet",
   "session.viewSettlement": "Settlement details",
