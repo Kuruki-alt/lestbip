@@ -20,9 +20,13 @@
 
   "lang.label": "言語",
 
+  "menu.open": "メニューを開く",
+  "menu.close": "メニューを閉じる",
+  "menu.title": "設定",
+
   "members.title": "メンバー編集",
 
-  "driver.label": "御者割",
+  "driver.label": "運転手の負担を軽減",
   "driver.off": "なし",
   "driver.on": "あり",
 

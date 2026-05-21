@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import AppLayout from '@/components/layout/AppLayout';
 import TopBar from '@/components/layout/TopBar';
+import SettingsDrawer from '@/components/layout/SettingsDrawer';
 import HomeScreen from '@/components/screens/HomeScreen';
 import NewSessionScreen from '@/components/screens/NewSessionScreen';
 import SessionScreen from '@/components/screens/SessionScreen';
@@ -60,6 +61,11 @@ function App() {
     initialPrefs.currency,
   );
 
+  // v2.0.0 改善案 #3: ハンバーガーから開く設定 Drawer の開閉状態
+  const [menuOpen, setMenuOpen] = useState(false);
+  const openMenu = useCallback(() => setMenuOpen(true), []);
+  const closeMenu = useCallback(() => setMenuOpen(false), []);
+
   // 設定が変わるたびに LocalStorage へ反映（部分マージ）。
   useEffect(() => {
     savePrefs({
@@ -75,6 +81,7 @@ function App() {
     openSession: storeOpenSession,
     closeSession,
     importSession,
+    patchSession,
   } = useSessions();
 
   // 表示通貨: セッションが開いている時は session.currency、無ければ既定
@@ -157,8 +164,35 @@ function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const topBar = (
-    <TopBar
+  const topBar = <TopBar t={t} onOpenMenu={openMenu} menuOpen={menuOpen} />;
+
+  // Drawer ハンドラ：セッションが開いていれば現在セッションに直接反映、
+  // 開いていなければ既定値（グローバル）に反映する（要件 §3.11 と整合）。
+  const handleDrawerCurrency = useCallback(
+    /** @param {string} v */
+    (v) => {
+      setCurrency(v);
+      if (currentSession) {
+        patchSession(currentSession.id, { currency: v });
+      }
+    },
+    [setCurrency, currentSession, patchSession],
+  );
+
+  const handleDrawerRounding = useCallback(
+    /** @param {string} v */
+    (v) => {
+      if (currentSession) {
+        patchSession(currentSession.id, { rounding: v });
+      }
+    },
+    [currentSession, patchSession],
+  );
+
+  const drawer = (
+    <SettingsDrawer
+      open={menuOpen}
+      onClose={closeMenu}
       t={t}
       lang={lang}
       onLangChange={setLang}
@@ -166,10 +200,12 @@ function App() {
       onThemeFamilyChange={setFamily}
       colorMode={colorMode}
       onColorModeChange={setColorMode}
+      currency={displayCurrency}
+      onCurrencyChange={handleDrawerCurrency}
       driverDiscount={driverDiscount ? 'on' : 'off'}
       onDriverDiscountChange={handleDriverDiscountChange}
-      currency={displayCurrency}
-      onCurrencyChange={setCurrency}
+      rounding={currentSession?.rounding ?? 'floor'}
+      onRoundingChange={handleDrawerRounding}
     />
   );
 
@@ -238,7 +274,12 @@ function App() {
     );
   }
 
-  return <AppLayout topBar={topBar}>{body}</AppLayout>;
+  return (
+    <>
+      <AppLayout topBar={topBar}>{body}</AppLayout>
+      {drawer}
+    </>
+  );
 }
 
 export default App;

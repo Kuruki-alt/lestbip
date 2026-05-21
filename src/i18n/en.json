@@ -20,9 +20,13 @@
 
   "lang.label": "Language",
 
+  "menu.open": "Open menu",
+  "menu.close": "Close menu",
+  "menu.title": "Settings",
+
   "members.title": "Edit members",
 
-  "driver.label": "Driver discount",
+  "driver.label": "Reduce driver's share",
   "driver.off": "Off",
   "driver.on": "On",
 
