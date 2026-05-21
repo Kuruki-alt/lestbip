@@ -7,12 +7,17 @@ import { genId } from '@/lib/ids';
 import { useSessions } from '@/hooks/useSessions';
 
 /**
- * 支払い記録 追加/編集画面（Phase 3：保存処理を結線）。
+ * 支払い記録 追加/編集画面（v3.0.0 改修案 #1：3 入力を文章レイアウトに統合）。
  * 制御フォーム。編集時は currentSession.payments から該当 Payment を読み込み、
  * 保存時は patchSession で payments 配列を更新する。
  *
+ * 上部の主要入力は「[立替えた仲間] が [出費名] に [金額] 支払った。」のように
+ * 1 行の文章として表示する。英語時は「[payer] paid [total] for [name].」の
+ * 語順に切り替える。
+ *
  * @param {Object} props
  * @param {(key: string) => string} props.t
+ * @param {'ja'|'en'} [props.lang='ja']
  * @param {string|null} props.editPaymentId
  * @param {boolean} [props.driverDiscountEnabled=false]
  * @param {() => void} props.onSave
@@ -20,6 +25,7 @@ import { useSessions } from '@/hooks/useSessions';
  */
 function PaymentFormScreen({
   t,
+  lang = 'ja',
   editPaymentId = null,
   driverDiscountEnabled = false,
   onSave,
@@ -220,24 +226,13 @@ function PaymentFormScreen({
         </h2>
       </div>
 
-      <Card className="flex flex-col gap-4">
-        <label className="flex flex-col gap-1 text-sm">
-          <span className="app-text font-semibold">{t('payment.name')}</span>
-          <input
-            type="text"
-            value={name}
-            onChange={handleName}
-            placeholder={t('payment.namePlaceholder')}
-            className="app-card app-field border px-3 py-2"
-          />
-        </label>
-
-        <label className="flex flex-col gap-1 text-sm">
-          <span className="app-text font-semibold">{t('payment.payer')}</span>
+      <Card className="flex flex-col gap-2">
+        <div className="app-text flex flex-wrap items-center gap-x-2 gap-y-2 text-base leading-relaxed">
           <select
             value={payerId}
             onChange={handlePayer}
-            className="app-card app-field border px-3 py-2"
+            aria-label={t('payment.payer')}
+            className="app-card app-field border px-2 py-1.5"
           >
             {members.map((m) => (
               <option key={m.id} value={m.id}>
@@ -245,20 +240,54 @@ function PaymentFormScreen({
               </option>
             ))}
           </select>
-        </label>
-
-        <label className="flex flex-col gap-1 text-sm">
-          <span className="app-text font-semibold">{t('payment.total')}</span>
-          <input
-            type="number"
-            inputMode="numeric"
-            min="0"
-            value={total}
-            onChange={handleTotal}
-            placeholder="0"
-            className="app-card app-field border px-3 py-2"
-          />
-        </label>
+          <span className="app-text-muted">{t('payment.sentenceP1')}</span>
+          {lang === 'ja' ? (
+            <>
+              <input
+                type="text"
+                value={name}
+                onChange={handleName}
+                placeholder={t('payment.namePlaceholder')}
+                aria-label={t('payment.name')}
+                className="app-card app-field min-w-0 flex-1 border px-2 py-1.5"
+              />
+              <span className="app-text-muted">{t('payment.sentenceP2')}</span>
+              <input
+                type="number"
+                inputMode="numeric"
+                min="0"
+                value={total}
+                onChange={handleTotal}
+                placeholder="0"
+                aria-label={t('payment.total')}
+                className="app-card app-field w-28 border px-2 py-1.5 text-right"
+              />
+            </>
+          ) : (
+            <>
+              <input
+                type="number"
+                inputMode="numeric"
+                min="0"
+                value={total}
+                onChange={handleTotal}
+                placeholder="0"
+                aria-label={t('payment.total')}
+                className="app-card app-field w-28 border px-2 py-1.5 text-right"
+              />
+              <span className="app-text-muted">{t('payment.sentenceP2')}</span>
+              <input
+                type="text"
+                value={name}
+                onChange={handleName}
+                placeholder={t('payment.namePlaceholder')}
+                aria-label={t('payment.name')}
+                className="app-card app-field min-w-0 flex-1 border px-2 py-1.5"
+              />
+            </>
+          )}
+          <span className="app-text-muted">{t('payment.sentenceP3')}</span>
+        </div>
       </Card>
 
       <Card className="flex flex-col gap-3">
@@ -382,6 +411,7 @@ function PaymentFormScreen({
 
 PaymentFormScreen.propTypes = {
   t: PropTypes.func.isRequired,
+  lang: PropTypes.oneOf(['ja', 'en']),
   editPaymentId: PropTypes.string,
   driverDiscountEnabled: PropTypes.bool,
   onSave: PropTypes.func.isRequired,

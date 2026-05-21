@@ -166,25 +166,67 @@ describe('calculateSettlement — 御者割（全体>個別）', () => {
 });
 
 describe('calculateSettlement — 個人間支払い', () => {
-  it('直接やり取り（waived 不問）は net に反映される', () => {
+  it('通常の直接やり取りは net に反映される', () => {
     const r = calculateSettlement(
       makeSession({
         payments: [{ id: 'p-1', name: 'd', payerId: 'm-1', total: 3000 }],
         directPayments: [
           { id: 'd-1', fromId: 'm-2', toId: 'm-1', amount: 500 },
+        ],
+      }),
+    );
+    // m-1: paid 3000, burdens 1000+500=1500, net=1500
+    expect(r.net['m-1']).toBe(1500);
+    // m-2: paid 500, burdens 1000, net=-500
+    expect(r.net['m-2']).toBe(-500);
+    // m-3: paid 0, burdens 1000, net=-1000
+    expect(r.net['m-3']).toBe(-1000);
+  });
+
+  it('「いいよ！」(waived) は from の負債をゼロにし、to には計上しない (v3.0.0 #3)', () => {
+    const r = calculateSettlement(
+      makeSession({
+        payments: [{ id: 'p-1', name: 'd', payerId: 'm-1', total: 3000 }],
+        directPayments: [
+          { id: 'd-1', fromId: 'm-2', toId: 'm-1', amount: 500 },
+          // m-3 の負債を完全免除 (amount は無視される)
           { id: 'd-2', fromId: 'm-3', toId: 'm-1', amount: 200, waived: true },
         ],
       }),
     );
-    // m-1: paid 3000 + received 500+200=700(burdens), burdens 1000+700=1700
-    //      net = 3000 - 1700 = 1300
-    expect(r.net['m-1']).toBe(1300);
-    // m-2: paid 500, burdens 1000 → net = -500
+    // m-1: paid 3000, burdens 1500 (waived は加算しない)
+    expect(r.net['m-1']).toBe(1500);
+    // m-2: paid 500, burdens 1000, net=-500
     expect(r.net['m-2']).toBe(-500);
-    // m-3: paid 200(waived扱い), burdens 1000 → net = -800
-    expect(r.net['m-3']).toBe(-800);
-    // 合計 = 0
-    expect(r.net['m-1'] + r.net['m-2'] + r.net['m-3']).toBe(0);
+    // m-3: 負債 1000 を paid に積み増して net=0 (完全免除)
+    expect(r.net['m-3']).toBe(0);
+  });
+
+  it('waived 単独で from の負債を完全に消す', () => {
+    const r = calculateSettlement(
+      makeSession({
+        payments: [{ id: 'p-1', name: 'd', payerId: 'm-1', total: 3000 }],
+        directPayments: [
+          { id: 'd-1', fromId: 'm-2', toId: 'm-1', amount: 0, waived: true },
+        ],
+      }),
+    );
+    expect(r.net['m-2']).toBe(0);
+    // m-1 は 1000 を「肩代わり」する形になり受取超過のまま
+    expect(r.net['m-1']).toBe(2000);
+  });
+
+  it('waived 対象が既に黒字なら何もしない', () => {
+    const r = calculateSettlement(
+      makeSession({
+        payments: [{ id: 'p-1', name: 'd', payerId: 'm-2', total: 3000 }],
+        directPayments: [
+          { id: 'd-1', fromId: 'm-2', toId: 'm-1', amount: 0, waived: true },
+        ],
+      }),
+    );
+    // m-2 は paid 3000, burdens 1000 → 黒字なので waived 影響なし
+    expect(r.net['m-2']).toBe(2000);
   });
 });
 

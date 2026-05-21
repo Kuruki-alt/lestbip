@@ -239,6 +239,7 @@ function App() {
     body = (
       <PaymentFormScreen
         t={t}
+        lang={lang}
         editPaymentId={editPaymentId}
         driverDiscountEnabled={driverDiscount}
         onSave={goSession}

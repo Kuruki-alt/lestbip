@@ -11,6 +11,7 @@
  *
  * @typedef {{ type: 'HYDRATE', sessions: Session[] }
  *        | { type: 'CREATE_SESSION', session: Session }
+ *        | { type: 'UPSERT_SESSION', session: Session }
  *        | { type: 'OPEN_SESSION', id: string }
  *        | { type: 'CLOSE_SESSION' }
  *        | { type: 'DELETE_SESSION', id: string }
@@ -77,6 +78,20 @@ export function sessionsReducer(state, action) {
         sessions: sortByUpdated([action.session, ...state.sessions]),
         currentSessionId: action.session.id,
       };
+    case 'UPSERT_SESSION': {
+      // 共有URL 取り込み用：同 id があれば上書き、無ければ追加。
+      // 取り込み直後は current として開く（v3.0.0 改修案 #2）。
+      const sessions = upsert(
+        state.sessions,
+        touch(action.session),
+        bySessionId(action.session.id),
+      );
+      return {
+        ...state,
+        sessions: sortByUpdated(sessions),
+        currentSessionId: action.session.id,
+      };
+    }
     case 'OPEN_SESSION':
       return { ...state, currentSessionId: action.id };
     case 'CLOSE_SESSION':

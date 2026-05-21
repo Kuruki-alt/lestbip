@@ -7,8 +7,10 @@
  *  - 端数処理（floor / ceil / round）はセッション単位
  *  - 御者割（オプション）: 10km につき 1% で御者の負担を軽減。
  *    全体（セッション）設定が各支払いより優先。
- *  - 個人間支払い（返済 / waived）を全体集計から差し引き、
- *    最小送金リストは差し引き後で算出。
+ *  - 個人間支払い（返済）を全体集計から差し引き、最小送金リストは差し引き後で算出。
+ *  - 「いいよ！」(waived) は完全免除：from の現時点の負債 (burdens - paid) を
+ *    paid 側に積み増して net を 0 まで戻す。to への追加負担計上は行わない
+ *    （v3.0.0 改修案 #3）。
  *
  * @typedef {Object} Member
  * @property {string} id
@@ -253,8 +255,20 @@ export function calculateSettlement(session) {
     roundingDiff += (Number(p.total) || 0) - sumAlloc;
   }
 
-  // 個人間支払いの反映（waived も同じ会計、from/to の net に同額計上）
+  // 個人間支払いの反映（v3.0.0 改修案 #3）：
+  // - 通常 (waived=false): paid[from]+=amount, burdens[to]+=amount で資金移動を反映
+  // - waived=true:         完全免除。from の現時点の負債 (burdens - paid) を
+  //   paid[from] に積み増し net を 0 まで戻す。to への計上は行わない（負債を
+  //   to が肩代わりするわけではなく、全体支払いから消える挙動）。
   for (const d of directs) {
+    if (d.waived) {
+      if (!paid.has(d.fromId) || !burdens.has(d.fromId)) continue;
+      const debt = getNum(burdens, d.fromId, 0) - getNum(paid, d.fromId, 0);
+      if (debt > EPSILON) {
+        paid.set(d.fromId, getNum(paid, d.fromId, 0) + debt);
+      }
+      continue;
+    }
     const amt = Number(d.amount) || 0;
     if (paid.has(d.fromId)) {
       paid.set(d.fromId, getNum(paid, d.fromId, 0) + amt);
