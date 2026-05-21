@@ -1,5 +1,5 @@
 {
-  "app.title": "Warikan",
+  "app.title": "Lestbip!!",
   "app.subtitle": "Split shared expenses with ease",
 
   "common.back": "Back",
@@ -20,7 +20,13 @@
 
   "lang.label": "Language",
 
-  "driver.label": "Driver discount",
+  "menu.open": "Open menu",
+  "menu.close": "Close menu",
+  "menu.title": "Settings",
+
+  "members.title": "Edit members",
+
+  "driver.label": "Reduce driver's share",
   "driver.off": "Off",
   "driver.on": "On",
 
@@ -45,6 +51,7 @@
   "session.paymentsEmpty": "No payments yet",
   "session.addPayment": "Add payment",
   "session.addMember": "Add member",
+  "session.editMembers": "Edit members",
   "session.summary": "Settlement summary",
   "session.summaryEmpty": "No transfers needed yet",
   "session.viewSettlement": "Settlement details",

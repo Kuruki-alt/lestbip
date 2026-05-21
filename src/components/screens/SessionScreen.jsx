@@ -1,17 +1,18 @@
 import PropTypes from 'prop-types';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo } from 'react';
 import Button from '@/components/ui/Button';
 import Card from '@/components/ui/Card';
-import SegmentedToggle from '@/components/ui/SegmentedToggle';
-import { formatAmount, SUPPORTED_CURRENCIES } from '@/lib/currency';
+import { formatAmount } from '@/lib/currency';
 import { WAIVED_ICON } from '@/lib/icons';
 import { calculateSettlement } from '@/lib/calculator';
 import { useSessions } from '@/hooks/useSessions';
 
 /**
- * セッション画面（メイン）：
+ * セッション画面（メイン、v2.0.0 改善案 #2, #3）：
  * セッション名・メンバー、支払い記録一覧（追加/編集/削除）、
  * 精算結果サマリー（calculator でライブ算出）、URLシェアボタン。
+ * メンバー追加・削除は MembersScreen へ分離（「メンバー編集へ」ボタンで遷移）。
+ * 端数処理・通貨等の設定は SettingsDrawer へ集約（本画面の設定 Card は削除）。
  *
  * @param {Object} props
  * @param {(key: string) => string} props.t
@@ -20,6 +21,7 @@ import { useSessions } from '@/hooks/useSessions';
  * @param {() => void} props.onBack
  * @param {(paymentId: string|null) => void} props.onEditPayment
  * @param {() => void} props.onAddDirectPayment
+ * @param {() => void} props.onEditMembers       メンバー編集画面へ
  * @param {() => void} props.onViewSettlement
  * @param {() => void} props.onShare
  */
@@ -30,12 +32,11 @@ function SessionScreen({
   onBack,
   onEditPayment,
   onAddDirectPayment,
+  onEditMembers,
   onViewSettlement,
   onShare,
 }) {
-  const { currentSession, patchSession, addMember } = useSessions();
-  // メンバー後追加用の入力
-  const [draftMember, setDraftMember] = useState('');
+  const { currentSession, patchSession } = useSessions();
 
   // 派生配列を useMemo で安定化（参照変化による不要な再計算を防ぐ）
   const members = useMemo(
@@ -97,66 +98,6 @@ function SessionScreen({
     [currentSession, directPayments, patchSession],
   );
 
-  const handleDraftMember = useCallback(
-    /** @param {React.ChangeEvent<HTMLInputElement>} e */
-    (e) => setDraftMember(e.target.value),
-    [],
-  );
-
-  const handleAddMember = useCallback(() => {
-    const name = draftMember.trim();
-    if (!name || !currentSession) return;
-    addMember(currentSession.id, name);
-    setDraftMember('');
-  }, [draftMember, currentSession, addMember]);
-
-  const handleMemberKeyDown = useCallback(
-    /** @param {React.KeyboardEvent<HTMLInputElement>} e */
-    (e) => {
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        handleAddMember();
-      }
-    },
-    [handleAddMember],
-  );
-
-  // 端数処理モード切替（要件 §3.6）
-  const roundingOptions = useMemo(
-    () => [
-      { value: 'floor', label: t('session.roundingFloor') },
-      { value: 'ceil', label: t('session.roundingCeil') },
-      { value: 'round', label: t('session.roundingRound') },
-    ],
-    [t],
-  );
-  const handleRoundingChange = useCallback(
-    /** @param {string} v */
-    (v) => {
-      if (currentSession) patchSession(currentSession.id, { rounding: v });
-    },
-    [currentSession, patchSession],
-  );
-
-  // セッション内通貨切替（要件 §3.11）
-  const handleSessionCurrency = useCallback(
-    /** @param {React.ChangeEvent<HTMLSelectElement>} e */
-    (e) => {
-      if (currentSession) {
-        patchSession(currentSession.id, { currency: e.target.value });
-      }
-    },
-    [currentSession, patchSession],
-  );
-  const currencyOptions = useMemo(
-    () =>
-      SUPPORTED_CURRENCIES.map((c) => ({
-        code: c.code,
-        label: lang === 'en' ? c.labelEn : c.labelJa,
-      })),
-    [lang],
-  );
-
   // セッション未選択時の保険（通常は App ルーターがホームに戻すが念のため）
   if (!currentSession) {
     return (
@@ -200,49 +141,9 @@ function SessionScreen({
             ))
           )}
         </div>
-        <div className="flex gap-2">
-          <input
-            type="text"
-            value={draftMember}
-            onChange={handleDraftMember}
-            onKeyDown={handleMemberKeyDown}
-            placeholder={t('newSession.memberPlaceholder')}
-            aria-label={t('session.addMember')}
-            className="app-card app-field min-w-0 flex-1 border px-3 py-1.5 text-sm"
-          />
-          <Button variant="secondary" onClick={handleAddMember}>
-            + {t('session.addMember')}
-          </Button>
-        </div>
-      </Card>
-
-      <Card className="flex flex-col gap-3">
-        <h3 className="app-text-muted text-sm font-semibold">
-          {t('session.settings')}
-        </h3>
-        <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
-          <span className="app-text">{t('session.rounding')}</span>
-          <SegmentedToggle
-            label={t('session.rounding')}
-            options={roundingOptions}
-            value={currentSession.rounding ?? 'floor'}
-            onChange={handleRoundingChange}
-          />
-        </div>
-        <label className="flex flex-wrap items-center justify-between gap-2 text-sm">
-          <span className="app-text">{t('currency.label')}</span>
-          <select
-            value={currentSession.currency ?? 'JPY'}
-            onChange={handleSessionCurrency}
-            className="app-card app-field border px-2 py-1 text-xs"
-          >
-            {currencyOptions.map((opt) => (
-              <option key={opt.code} value={opt.code}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
-        </label>
+        <Button variant="secondary" fullWidth onClick={onEditMembers}>
+          {t('session.editMembers')} →
+        </Button>
       </Card>
 
       <div className="flex flex-col gap-3">
@@ -407,6 +308,7 @@ SessionScreen.propTypes = {
   onBack: PropTypes.func.isRequired,
   onEditPayment: PropTypes.func.isRequired,
   onAddDirectPayment: PropTypes.func.isRequired,
+  onEditMembers: PropTypes.func.isRequired,
   onViewSettlement: PropTypes.func.isRequired,
   onShare: PropTypes.func.isRequired,
 };

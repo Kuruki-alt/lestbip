@@ -28,7 +28,7 @@ function SegmentedToggle({ label, options, value, onChange }) {
     <div
       role="group"
       aria-label={label}
-      className="app-card app-surface-2 inline-flex p-0.5"
+      className="app-card app-surface-2 inline-flex self-start p-0.5"
     >
       {options.map((opt) => {
         const active = opt.value === value;
