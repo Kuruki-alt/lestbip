@@ -202,24 +202,23 @@ describe('calculateSettlement — 個人間支払い', () => {
     expect(r.net['m-3']).toBe(0);
   });
 
-  it('waived & amount>0 は from を Y のみ負担にし、差額を他メンバー全員で等分 (v3.0.1)', () => {
+  it('waived & amount>0 は from が Y を支払って net 0 になり見通しから外れる (v3.2.1)', () => {
     const r = calculateSettlement(
       makeSession({
         payments: [{ id: 'p-1', name: 'd', payerId: 'm-1', total: 3000 }],
         directPayments: [
           { id: 'd-1', fromId: 'm-2', toId: 'm-1', amount: 500 },
-          // m-3 の負債 1000 を Y=200 だけ負担、残 800 を m-1/m-2 で等分 (400 ずつ)
+          // m-3 が 200 を m-1 に支払い、残債 800 を m-1/m-2 で等分 (400 ずつ)
           { id: 'd-2', fromId: 'm-3', toId: 'm-1', amount: 200, waived: true },
         ],
       }),
     );
-    // m-1: paid 3000, burdens 1000+500+400=1900, net=1100
-    expect(r.net['m-1']).toBe(1100);
+    // m-1: paid 3000, burdens 1000+500+200(転送)+400(肩代わり)=2100, net=900
+    expect(r.net['m-1']).toBe(900);
     // m-2: paid 500, burdens 1000+400=1400, net=-900
     expect(r.net['m-2']).toBe(-900);
-    // m-3: paid 800 (積み増し), burdens 1000, net=-200 (= -Y)
-    expect(r.net['m-3']).toBe(-200);
-    // 合計 0
+    // m-3: 200 支払って net=0 → 見通しから外れる
+    expect(r.net['m-3']).toBe(0);
     expect(r.net['m-1'] + r.net['m-2'] + r.net['m-3']).toBe(0);
   });
 
@@ -237,23 +236,26 @@ describe('calculateSettlement — 個人間支払い', () => {
     expect(r.net['m-1']).toBe(2000);
   });
 
-  it('waived 単独 (amount>0) で部分免除し、差額を他全員で等分', () => {
+  it('waived 単独 (amount>0) で from が Y 支払い net 0、差額を他全員で等分', () => {
     const r = calculateSettlement(
       makeSession({
         payments: [{ id: 'p-1', name: 'd', payerId: 'm-1', total: 3000 }],
         directPayments: [
-          // m-2 の負債 1000 を Y=400 のみ負担、差額 600 を m-1/m-3 で等分 (300 ずつ)
+          // m-2 が 400 を m-1 に支払い、残債 600 を m-1/m-3 で等分 (300 ずつ)
           { id: 'd-1', fromId: 'm-2', toId: 'm-1', amount: 400, waived: true },
         ],
       }),
     );
-    expect(r.net['m-1']).toBe(1700); // paid 3000 − burdens 1300
-    expect(r.net['m-2']).toBe(-400); // = -Y
-    expect(r.net['m-3']).toBe(-1300); // paid 0 − burdens 1300
+    // m-1: paid 3000, burdens 1000+400(転送)+300(肩代わり)=1700, net=1300
+    expect(r.net['m-1']).toBe(1300);
+    // m-2: 400 支払って net=0
+    expect(r.net['m-2']).toBe(0);
+    // m-3: paid 0, burdens 1300, net=-1300
+    expect(r.net['m-3']).toBe(-1300);
     expect(r.net['m-1'] + r.net['m-2'] + r.net['m-3']).toBe(0);
   });
 
-  it('waived 対象が既に黒字なら何もしない', () => {
+  it('waived 対象が既に黒字なら何もしない (amount>0 でも)', () => {
     const r = calculateSettlement(
       makeSession({
         payments: [{ id: 'p-1', name: 'd', payerId: 'm-2', total: 3000 }],
@@ -264,21 +266,26 @@ describe('calculateSettlement — 個人間支払い', () => {
     );
     // m-2 は paid 3000, burdens 1000 → 黒字なので waived 影響なし
     expect(r.net['m-2']).toBe(2000);
+    expect(r.net['m-1']).toBe(-1000);
+    expect(r.net['m-3']).toBe(-1000);
   });
 
-  it('waived & Y >= D は完全に元の負担と同じ (差額なし)', () => {
+  it('waived & Y >= D は Y を D にクランプし from を完全に支払い済みに', () => {
     const r = calculateSettlement(
       makeSession({
         payments: [{ id: 'p-1', name: 'd', payerId: 'm-1', total: 3000 }],
         directPayments: [
-          // Y=2000 > D=1000 → Y=D にクランプ、差額 0、他メンバーは影響なし
+          // Y=2000 > D=1000 → Y=1000 にクランプ。m-2 は全額支払い済み net=0
           { id: 'd-1', fromId: 'm-2', toId: 'm-1', amount: 2000, waived: true },
         ],
       }),
     );
-    expect(r.net['m-2']).toBe(-1000); // 元のまま
-    expect(r.net['m-3']).toBe(-1000); // 元のまま
-    expect(r.net['m-1']).toBe(2000); // 元のまま
+    // m-1: paid 3000, burdens 1000+1000(転送)=2000, net=1000
+    expect(r.net['m-1']).toBe(1000);
+    // m-2: 1000 支払って net=0 (過払いにはならない)
+    expect(r.net['m-2']).toBe(0);
+    // m-3: 元のまま
+    expect(r.net['m-3']).toBe(-1000);
   });
 });
 
