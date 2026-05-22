@@ -1,5 +1,5 @@
 import PropTypes from 'prop-types';
-import { useCallback, useEffect, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import SegmentedToggle from '@/components/ui/SegmentedToggle';
 import { SUPPORTED_CURRENCIES } from '@/lib/currency';
 
@@ -45,6 +45,36 @@ function SettingsDrawer({
   rounding,
   onRoundingChange,
 }) {
+  // open=DOM 上の存在 / visible=スライド表示状態 を分離し、開閉アニメを実現する。
+  // 開く時: マウント → 次フレームで visible=true でスライドイン。
+  // 閉じる時: visible=false でスライドアウト → transitionend でアンマウント。
+  const [mounted, setMounted] = useState(open);
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    if (open) {
+      setMounted(true);
+      // 2 フレーム待ってから可視化（初回レイアウトと同フレームだと transition が走らない）
+      const id = requestAnimationFrame(() =>
+        requestAnimationFrame(() => setVisible(true)),
+      );
+      return () => cancelAnimationFrame(id);
+    }
+    setVisible(false);
+    return undefined;
+  }, [open]);
+
+  const handleTransitionEnd = useCallback(
+    /** @param {React.TransitionEvent<HTMLElement>} e */
+    (e) => {
+      // パネルのスライド（transform）完了かつ閉状態のときだけアンマウント
+      if (e.propertyName === 'transform' && !open) {
+        setMounted(false);
+      }
+    },
+    [open],
+  );
+
   // Esc キーで閉じる
   useEffect(() => {
     if (!open) return undefined;
@@ -111,7 +141,7 @@ function SettingsDrawer({
     [onCurrencyChange],
   );
 
-  if (!open) return null;
+  if (!mounted) return null;
 
   return (
     <div
@@ -120,16 +150,23 @@ function SettingsDrawer({
       aria-labelledby="settings-drawer-title"
       className="fixed inset-0 z-50"
     >
-      {/* オーバーレイ（クリックで閉じる） */}
+      {/* オーバーレイ（クリックで閉じる、フェード） */}
       <button
         type="button"
         onClick={onClose}
         aria-label={t('menu.close')}
-        className="absolute inset-0 bg-black/40"
+        className={`absolute inset-0 bg-black/40 transition-opacity duration-300 ease-out ${
+          visible ? 'opacity-100' : 'opacity-0'
+        }`}
       />
 
-      {/* パネル本体 */}
-      <aside className="app-surface absolute right-0 top-0 flex h-full w-[min(85%,360px)] flex-col gap-4 overflow-y-auto border-l p-5 shadow-xl">
+      {/* パネル本体（右からスライド） */}
+      <aside
+        onTransitionEnd={handleTransitionEnd}
+        className={`app-surface absolute right-0 top-0 flex h-full w-[min(85%,360px)] flex-col gap-4 overflow-y-auto border-l p-5 shadow-xl transition-transform duration-300 ease-out will-change-transform ${
+          visible ? 'translate-x-0' : 'translate-x-full'
+        }`}
+      >
         <div className="flex items-center justify-between">
           <h2
             id="settings-drawer-title"
