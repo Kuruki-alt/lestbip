@@ -224,37 +224,30 @@ function SessionScreen({
           </p>
         ) : (
           <ul className="flex flex-col gap-2">
-            {directPayments.map((d) => {
-              const amt = formatAmount(d.amount, currency, lang);
-              return (
-                <li
-                  key={d.id}
-                  className="app-card app-accent-soft flex items-center justify-between gap-3 px-3 py-2"
-                >
-                  <div className="flex min-w-0 flex-col gap-0.5">
-                    <div className="app-text flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
-                      <span>{memberNameById.get(d.fromId) ?? '?'}</span>
-                      <span className="app-danger-fg font-semibold">
-                        −{amt}
-                      </span>
-                      <span className="app-text-muted">→</span>
-                      <span>{memberNameById.get(d.toId) ?? '?'}</span>
-                      {!d.waived ? (
-                        <span className="app-accent-fg font-semibold">
-                          +{amt}
-                        </span>
-                      ) : null}
-                    </div>
-                    {d.waived ? (
-                      <span
-                        title={t('session.waivedBadge')}
-                        className="app-card app-happy inline-flex w-fit items-center gap-1 px-2 py-0.5 text-[11px] font-semibold"
-                      >
-                        <span aria-hidden="true">{WAIVED_ICON}</span>
-                        {t('session.waivedShort')}
-                      </span>
-                    ) : null}
-                  </div>
+            {directPayments.map((d) => (
+              <li
+                key={d.id}
+                className="app-card app-accent-soft flex items-center justify-between gap-3 px-3 py-2"
+              >
+                <div className="flex min-w-0 flex-col gap-0.5">
+                  <span className="app-text truncate text-sm">
+                    {memberNameById.get(d.fromId) ?? '?'} {t('settlement.pays')}{' '}
+                    {memberNameById.get(d.toId) ?? '?'}
+                  </span>
+                  {d.waived ? (
+                    <span
+                      title={t('session.waivedBadge')}
+                      className="app-card app-happy inline-flex w-fit items-center gap-1 px-2 py-0.5 text-[11px] font-semibold"
+                    >
+                      <span aria-hidden="true">{WAIVED_ICON}</span>
+                      {t('session.waivedShort')}
+                    </span>
+                  ) : null}
+                </div>
+                <div className="flex shrink-0 items-center gap-2">
+                  <span className="app-accent-fg font-semibold">
+                    {formatAmount(d.amount, currency, lang)}
+                  </span>
                   <Button
                     variant="danger"
                     dataValue={d.id}
@@ -265,9 +258,9 @@ function SessionScreen({
                   >
                     {t('common.delete')}
                   </Button>
-                </li>
-              );
-            })}
+                </div>
+              </li>
+            ))}
           </ul>
         )}
       </div>
