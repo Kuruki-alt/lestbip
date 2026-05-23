@@ -5,6 +5,7 @@ import Card from '@/components/ui/Card';
 import { distanceToDiscountPct } from '@/lib/driverDiscount';
 import { genId } from '@/lib/ids';
 import { useSessions } from '@/hooks/useSessions';
+import mahoutukaiIcon from '@/assets/icons/mahoutukai.png';
 
 /**
  * 支払い記録 追加/編集画面（v3.0.0 改修案 #1：3 入力を文章レイアウトに統合）。
@@ -221,9 +222,16 @@ function PaymentFormScreen({
         <Button variant="ghost" onClick={onCancel}>
           ← {t('common.cancel')}
         </Button>
-        <h2 className="app-text text-base font-bold">
-          {isEdit ? t('payment.titleEdit') : t('payment.titleNew')}
-        </h2>
+        <div className="flex items-center gap-2">
+          <img
+            src={mahoutukaiIcon}
+            alt=""
+            className="h-10 w-10 shrink-0 object-contain"
+          />
+          <h2 className="app-text text-base font-bold">
+            {isEdit ? t('payment.titleEdit') : t('payment.titleNew')}
+          </h2>
+        </div>
       </div>
 
       <Card className="flex flex-col gap-3">

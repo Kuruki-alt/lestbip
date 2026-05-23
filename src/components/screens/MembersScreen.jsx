@@ -3,6 +3,7 @@ import { useCallback, useState } from 'react';
 import Button from '@/components/ui/Button';
 import Card from '@/components/ui/Card';
 import { useSessions } from '@/hooks/useSessions';
+import asobininIcon from '@/assets/icons/asobinin.png';
 
 /**
  * メンバー編集画面（v2.0.0 新設、改善案 #2）：
@@ -75,7 +76,14 @@ function MembersScreen({ t, onBack }) {
         <Button variant="ghost" onClick={onBack}>
           ← {t('common.back')}
         </Button>
-        <h2 className="app-text text-base font-bold">{t('members.title')}</h2>
+        <div className="flex items-center gap-2">
+          <img
+            src={asobininIcon}
+            alt=""
+            className="h-10 w-10 shrink-0 object-contain"
+          />
+          <h2 className="app-text text-base font-bold">{t('members.title')}</h2>
+        </div>
       </div>
 
       <Card className="flex flex-col gap-3">

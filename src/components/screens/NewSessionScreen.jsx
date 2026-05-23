@@ -3,6 +3,7 @@ import { useCallback, useRef, useState } from 'react';
 import Button from '@/components/ui/Button';
 import Card from '@/components/ui/Card';
 import { useSessions } from '@/hooks/useSessions';
+import sensiIcon from '@/assets/icons/sensi.png';
 
 /**
  * 新規セッション作成画面：
@@ -106,9 +107,16 @@ function NewSessionScreen({ t, defaultCurrency = 'JPY', onBack, onCreate }) {
         <Button variant="ghost" onClick={onBack}>
           ← {t('common.back')}
         </Button>
-        <h2 className="app-text text-base font-bold">
-          {t('newSession.title')}
-        </h2>
+        <div className="flex items-center gap-2">
+          <img
+            src={sensiIcon}
+            alt=""
+            className="h-10 w-10 shrink-0 object-contain"
+          />
+          <h2 className="app-text text-base font-bold">
+            {t('newSession.title')}
+          </h2>
+        </div>
       </div>
 
       <Card className="flex flex-col gap-4">

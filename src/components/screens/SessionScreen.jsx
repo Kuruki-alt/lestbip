@@ -2,6 +2,7 @@ import PropTypes from 'prop-types';
 import { useCallback, useMemo } from 'react';
 import Button from '@/components/ui/Button';
 import Card from '@/components/ui/Card';
+import yumitukaiIcon from '@/assets/icons/yumitukai.png';
 import { formatAmount } from '@/lib/currency';
 import { WAIVED_ICON } from '@/lib/icons';
 import { calculateSettlement } from '@/lib/calculator';
@@ -124,7 +125,14 @@ function SessionScreen({
       </div>
 
       <Card className="flex flex-col gap-3">
-        <h2 className="app-text text-lg font-bold">{currentSession.name}</h2>
+        <div className="flex items-center gap-2">
+          <img
+            src={yumitukaiIcon}
+            alt=""
+            className="h-11 w-11 shrink-0 object-contain"
+          />
+          <h2 className="app-text text-lg font-bold">{currentSession.name}</h2>
+        </div>
         <div className="flex flex-wrap gap-2">
           {members.length === 0 ? (
             <span className="app-text-muted text-xs">
