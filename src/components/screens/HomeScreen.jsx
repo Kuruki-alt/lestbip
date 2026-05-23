@@ -3,6 +3,7 @@ import { useCallback } from 'react';
 import Button from '@/components/ui/Button';
 import Card from '@/components/ui/Card';
 import { useSessions } from '@/hooks/useSessions';
+import yuushaIcon from '@/assets/icons/yuusha.png';
 
 /**
  * セッション更新日を「YYYY-MM-DD」形式で表示用に整形する。
@@ -55,7 +56,12 @@ function HomeScreen({ t, onCreateSession, onOpenSession }) {
 
   return (
     <div className="flex flex-col gap-6">
-      <Card className="flex flex-col gap-3">
+      <Card className="flex flex-col items-center gap-3 text-center">
+        <img
+          src={yuushaIcon}
+          alt=""
+          className="h-28 w-28 object-contain drop-shadow"
+        />
         <h2 className="app-text text-base font-bold">{t('home.newSession')}</h2>
         <Button fullWidth onClick={onCreateSession}>
           + {t('home.newSession')}

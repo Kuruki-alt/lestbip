@@ -4,6 +4,7 @@ import Button from '@/components/ui/Button';
 import Card from '@/components/ui/Card';
 import { genId } from '@/lib/ids';
 import { useSessions } from '@/hooks/useSessions';
+import sirhuIcon from '@/assets/icons/sirhu.png';
 
 /**
  * 個人間の支払い（返済）記録画面：
@@ -147,9 +148,16 @@ function DirectPaymentScreen({ t, onSave, onCancel, onWaive }) {
         <Button variant="ghost" onClick={onCancel}>
           ← {t('common.cancel')}
         </Button>
-        <h2 className="app-text text-base font-bold">
-          {t('directPayment.title')}
-        </h2>
+        <div className="flex items-center gap-2">
+          <img
+            src={sirhuIcon}
+            alt=""
+            className="h-10 w-10 shrink-0 object-contain"
+          />
+          <h2 className="app-text text-base font-bold">
+            {t('directPayment.title')}
+          </h2>
+        </div>
       </div>
 
       <Card className="flex flex-col gap-4">

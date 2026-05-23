@@ -7,6 +7,7 @@ import { formatAmount } from '@/lib/currency';
 import { WAIVED_ICON } from '@/lib/icons';
 import { calculateSettlement } from '@/lib/calculator';
 import { useSessions } from '@/hooks/useSessions';
+import souryoIcon from '@/assets/icons/souryo.png';
 
 /**
  * 精算結果詳細画面：
@@ -141,9 +142,16 @@ function SettlementScreen({
         <Button variant="ghost" onClick={onBack}>
           ← {t('common.back')}
         </Button>
-        <h2 className="app-text text-base font-bold">
-          {t('settlement.title')}
-        </h2>
+        <div className="flex items-center gap-2">
+          <img
+            src={souryoIcon}
+            alt=""
+            className="h-10 w-10 shrink-0 object-contain"
+          />
+          <h2 className="app-text text-base font-bold">
+            {t('settlement.title')}
+          </h2>
+        </div>
       </div>
 
       {driverDiscountEnabled ? (
