@@ -226,23 +226,28 @@ function PaymentFormScreen({
         </h2>
       </div>
 
-      <Card className="flex flex-col gap-2">
-        <div className="app-text flex flex-wrap items-center gap-x-2 gap-y-2 text-base leading-relaxed">
-          <select
-            value={payerId}
-            onChange={handlePayer}
-            aria-label={t('payment.payer')}
-            className="app-card app-field border px-2 py-1.5"
-          >
-            {members.map((m) => (
-              <option key={m.id} value={m.id}>
-                {m.name}
-              </option>
-            ))}
-          </select>
-          <span className="app-text-muted">{t('payment.sentenceP1')}</span>
-          {lang === 'ja' ? (
-            <>
+      <Card className="flex flex-col gap-3">
+        {lang === 'ja' ? (
+          // 日本語: 1 行ずつ「誰が / 何に / いくら使った」の文章レイアウト
+          <>
+            <div className="app-text flex items-center gap-2 text-base">
+              <select
+                value={payerId}
+                onChange={handlePayer}
+                aria-label={t('payment.payer')}
+                className="app-card app-field min-w-0 flex-1 border px-2 py-1.5"
+              >
+                {members.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.name}
+                  </option>
+                ))}
+              </select>
+              <span className="app-text-muted shrink-0">
+                {t('payment.sentenceP1')}
+              </span>
+            </div>
+            <div className="app-text flex items-center gap-2 text-base">
               <input
                 type="text"
                 value={name}
@@ -251,7 +256,11 @@ function PaymentFormScreen({
                 aria-label={t('payment.name')}
                 className="app-card app-field min-w-0 flex-1 border px-2 py-1.5"
               />
-              <span className="app-text-muted">{t('payment.sentenceP2')}</span>
+              <span className="app-text-muted shrink-0">
+                {t('payment.sentenceP2')}
+              </span>
+            </div>
+            <div className="app-text flex items-center gap-2 text-base">
               <input
                 type="number"
                 inputMode="numeric"
@@ -260,34 +269,51 @@ function PaymentFormScreen({
                 onChange={handleTotal}
                 placeholder="0"
                 aria-label={t('payment.total')}
-                className="app-card app-field w-28 border px-2 py-1.5 text-right"
+                className="app-card app-field min-w-0 flex-1 border px-2 py-1.5 text-right"
               />
-            </>
-          ) : (
-            <>
-              <input
-                type="number"
-                inputMode="numeric"
-                min="0"
-                value={total}
-                onChange={handleTotal}
-                placeholder="0"
-                aria-label={t('payment.total')}
-                className="app-card app-field w-28 border px-2 py-1.5 text-right"
-              />
-              <span className="app-text-muted">{t('payment.sentenceP2')}</span>
-              <input
-                type="text"
-                value={name}
-                onChange={handleName}
-                placeholder={t('payment.namePlaceholder')}
-                aria-label={t('payment.name')}
-                className="app-card app-field min-w-0 flex-1 border px-2 py-1.5"
-              />
-            </>
-          )}
-          <span className="app-text-muted">{t('payment.sentenceP3')}</span>
-        </div>
+              <span className="app-text-muted shrink-0">
+                {t('payment.sentenceP3')}
+              </span>
+            </div>
+          </>
+        ) : (
+          // 英語: 「[payer] paid [total] for [name].」の 1 行インライン
+          <div className="app-text flex flex-wrap items-center gap-x-2 gap-y-2 text-base leading-relaxed">
+            <select
+              value={payerId}
+              onChange={handlePayer}
+              aria-label={t('payment.payer')}
+              className="app-card app-field border px-2 py-1.5"
+            >
+              {members.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.name}
+                </option>
+              ))}
+            </select>
+            <span className="app-text-muted">{t('payment.sentenceP1')}</span>
+            <input
+              type="number"
+              inputMode="numeric"
+              min="0"
+              value={total}
+              onChange={handleTotal}
+              placeholder="0"
+              aria-label={t('payment.total')}
+              className="app-card app-field w-28 border px-2 py-1.5 text-right"
+            />
+            <span className="app-text-muted">{t('payment.sentenceP2')}</span>
+            <input
+              type="text"
+              value={name}
+              onChange={handleName}
+              placeholder={t('payment.namePlaceholder')}
+              aria-label={t('payment.name')}
+              className="app-card app-field min-w-0 flex-1 border px-2 py-1.5"
+            />
+            <span className="app-text-muted">{t('payment.sentenceP3')}</span>
+          </div>
+        )}
       </Card>
 
       <Card className="flex flex-col gap-3">
