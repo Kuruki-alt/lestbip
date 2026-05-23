@@ -183,79 +183,87 @@ describe('calculateSettlement — 個人間支払い', () => {
     expect(r.net['m-3']).toBe(-1000);
   });
 
-  it('waived & amount=0 は from の負債を完全に消し、他は変えない (v3.0.0 #3)', () => {
+  it('iiyo.md 本例: 残債は to(立替人) を除く他の債務者だけが肩代わり', () => {
+    // A(m-1) が 30000 立替・3人均等。B(m-2) を「いいよ」3000 で完済扱い。
     const r = calculateSettlement(
       makeSession({
-        payments: [{ id: 'p-1', name: 'd', payerId: 'm-1', total: 3000 }],
+        payments: [{ id: 'p-1', name: 'd', payerId: 'm-1', total: 30000 }],
         directPayments: [
-          { id: 'd-1', fromId: 'm-2', toId: 'm-1', amount: 500 },
-          // m-3 の負債を完全免除 (amount=0)
-          { id: 'd-2', fromId: 'm-3', toId: 'm-1', amount: 0, waived: true },
+          { id: 'd-1', fromId: 'm-2', toId: 'm-1', amount: 3000, waived: true },
         ],
       }),
     );
-    // m-1: paid 3000, burdens 1500 (waived は加算しない)
-    expect(r.net['m-1']).toBe(1500);
-    // m-2: paid 500, burdens 1000, net=-500
-    expect(r.net['m-2']).toBe(-500);
-    // m-3: 負債 1000 を paid に積み増して net=0
-    expect(r.net['m-3']).toBe(0);
+    // A: 立替を全額回収 → net 17000 (= C から)
+    expect(r.net['m-1']).toBe(17000);
+    // B: 3000 支払って net 0 → 見通しから消える
+    expect(r.net['m-2']).toBe(0);
+    // C: 自分の 10000 + B の残債 7000 = 17000 負担
+    expect(r.net['m-3']).toBe(-17000);
+    // 見通しは C → A 17000 の 1 件
+    expect(r.transfers).toHaveLength(1);
+    expect(r.transfers[0]).toMatchObject({
+      fromId: 'm-3',
+      toId: 'm-1',
+      amount: 17000,
+    });
   });
 
-  it('waived & amount>0 は from が Y を支払って net 0 になり見通しから外れる (v3.2.1)', () => {
+  it('iiyo amount=0: 残債全額を他の債務者が肩代わり', () => {
     const r = calculateSettlement(
       makeSession({
-        payments: [{ id: 'p-1', name: 'd', payerId: 'm-1', total: 3000 }],
-        directPayments: [
-          { id: 'd-1', fromId: 'm-2', toId: 'm-1', amount: 500 },
-          // m-3 が 200 を m-1 に支払い、残債 800 を m-1/m-2 で等分 (400 ずつ)
-          { id: 'd-2', fromId: 'm-3', toId: 'm-1', amount: 200, waived: true },
-        ],
-      }),
-    );
-    // m-1: paid 3000, burdens 1000+500+200(転送)+400(肩代わり)=2100, net=900
-    expect(r.net['m-1']).toBe(900);
-    // m-2: paid 500, burdens 1000+400=1400, net=-900
-    expect(r.net['m-2']).toBe(-900);
-    // m-3: 200 支払って net=0 → 見通しから外れる
-    expect(r.net['m-3']).toBe(0);
-    expect(r.net['m-1'] + r.net['m-2'] + r.net['m-3']).toBe(0);
-  });
-
-  it('waived 単独 (amount=0) で from の負債を完全に消す', () => {
-    const r = calculateSettlement(
-      makeSession({
-        payments: [{ id: 'p-1', name: 'd', payerId: 'm-1', total: 3000 }],
+        payments: [{ id: 'p-1', name: 'd', payerId: 'm-1', total: 30000 }],
         directPayments: [
           { id: 'd-1', fromId: 'm-2', toId: 'm-1', amount: 0, waived: true },
         ],
       }),
     );
+    // B の負担 10000 全額が C へ → A 10000 / B 0 / C 20000
+    expect(r.net['m-1']).toBe(20000);
     expect(r.net['m-2']).toBe(0);
-    // m-1 は 1000 を「肩代わり」する形になり受取超過のまま
-    expect(r.net['m-1']).toBe(2000);
+    expect(r.net['m-3']).toBe(-20000);
   });
 
-  it('waived 単独 (amount>0) で from が Y 支払い net 0、差額を他全員で等分', () => {
+  it('iiyo: 複数の他の債務者で残債を等分 (4人)', () => {
+    const four = [...members, { id: 'm-4', name: 'D' }];
     const r = calculateSettlement(
       makeSession({
-        payments: [{ id: 'p-1', name: 'd', payerId: 'm-1', total: 3000 }],
+        members: four,
+        payments: [{ id: 'p-1', name: 'd', payerId: 'm-1', total: 40000 }],
         directPayments: [
-          // m-2 が 400 を m-1 に支払い、残債 600 を m-1/m-3 で等分 (300 ずつ)
-          { id: 'd-1', fromId: 'm-2', toId: 'm-1', amount: 400, waived: true },
+          { id: 'd-1', fromId: 'm-2', toId: 'm-1', amount: 3000, waived: true },
         ],
       }),
     );
-    // m-1: paid 3000, burdens 1000+400(転送)+300(肩代わり)=1700, net=1300
-    expect(r.net['m-1']).toBe(1300);
-    // m-2: 400 支払って net=0
+    // B 残債 7000 を C・D で等分 (3500 ずつ) → C 13500 / D 13500
+    expect(r.net['m-1']).toBe(27000);
     expect(r.net['m-2']).toBe(0);
-    // m-3: paid 0, burdens 1300, net=-1300
-    expect(r.net['m-3']).toBe(-1300);
-    expect(r.net['m-1'] + r.net['m-2'] + r.net['m-3']).toBe(0);
+    expect(r.net['m-3']).toBe(-13500);
+    expect(r.net['m-4']).toBe(-13500);
   });
 
-  it('waived 対象が既に黒字なら何もしない (amount>0 でも)', () => {
+  it('iiyo: 他に債務者がいなければ to(立替人) がかぶる (2人)', () => {
+    const two = [
+      { id: 'm-1', name: 'A' },
+      { id: 'm-2', name: 'B' },
+    ];
+    const r = calculateSettlement(
+      makeSession({
+        members: two,
+        payments: [{ id: 'p-1', name: 'd', payerId: 'm-1', total: 20000 }],
+        directPayments: [
+          { id: 'd-1', fromId: 'm-2', toId: 'm-1', amount: 3000, waived: true },
+        ],
+      }),
+    );
+    // B は 3000 で完済 net 0、残債 7000 の肩代わり先がいないので A が受取減
+    expect(r.net['m-2']).toBe(0);
+    // A: paid 20000, burdens 10000+3000(転送)=13000, net 7000 (= 受け取れるのは B の 3000 のみ、残りは A 負担)
+    expect(r.net['m-1']).toBe(7000);
+    // 見通しは空 (B は完済、他に債務者なし)
+    expect(r.transfers).toHaveLength(0);
+  });
+
+  it('iiyo 対象が既に黒字なら何もしない', () => {
     const r = calculateSettlement(
       makeSession({
         payments: [{ id: 'p-1', name: 'd', payerId: 'm-2', total: 3000 }],
@@ -270,21 +278,18 @@ describe('calculateSettlement — 個人間支払い', () => {
     expect(r.net['m-3']).toBe(-1000);
   });
 
-  it('waived & Y >= D は Y を D にクランプし from を完全に支払い済みに', () => {
+  it('iiyo & Y >= D は Y を D にクランプし from を完済 (過払いなし)', () => {
     const r = calculateSettlement(
       makeSession({
         payments: [{ id: 'p-1', name: 'd', payerId: 'm-1', total: 3000 }],
         directPayments: [
-          // Y=2000 > D=1000 → Y=1000 にクランプ。m-2 は全額支払い済み net=0
+          // Y=2000 > D=1000 → Y=1000 にクランプ。m-2 全額支払いで net 0、残債なし
           { id: 'd-1', fromId: 'm-2', toId: 'm-1', amount: 2000, waived: true },
         ],
       }),
     );
-    // m-1: paid 3000, burdens 1000+1000(転送)=2000, net=1000
     expect(r.net['m-1']).toBe(1000);
-    // m-2: 1000 支払って net=0 (過払いにはならない)
     expect(r.net['m-2']).toBe(0);
-    // m-3: 元のまま
     expect(r.net['m-3']).toBe(-1000);
   });
 });

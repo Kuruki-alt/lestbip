@@ -8,12 +8,11 @@
  *  - 御者割（オプション）: 10km につき 1% で御者の負担を軽減。
  *    全体（セッション）設定が各支払いより優先。
  *  - 個人間支払い（返済）を全体集計から差し引き、最小送金リストは差し引き後で算出。
- *  - 「いいよ！」(waived) の挙動 (v3.0.0 #3 / v3.1.0 / v3.2.1 補正):
- *    - amount=0: 完全免除。from の現時点の負債 (burdens - paid) を paid 側に
- *      積み増し net を 0 まで戻す。to / 他メンバーには波及しない。
- *    - amount>0: from は Y を実際に to へ渡したものとして計上し、転送後に残る
- *      負債を from を除く他メンバー全員 (to 含む) で等分負担。from の net は 0 に
- *      なり最小送金（見通し）から外れる。
+ *  - 「いいよ！」(waived, iiyo.md / v3.6.0): 立替えた to が from に「Y だけ払えば完済」
+ *    と免除する操作。Y(=min(入力, 現在の負債)) を from→to の実支払いとして計上し、
+ *    from を完済(net 0, 見通しから除外)に。残債は from・to を除く他の債務者(net<0)で
+ *    等分肩代わり。他に債務者がいなければ立替えた to がかぶる。amount=0 も同様
+ *    （Y=0 → 残債全額を他の債務者へ）。from が黒字なら何もしない。
  *
  * @typedef {Object} Member
  * @property {string} id
@@ -258,48 +257,46 @@ export function calculateSettlement(session) {
     roundingDiff += (Number(p.total) || 0) - sumAlloc;
   }
 
-  // 個人間支払いの反映（v3.0.0 #3 / v3.1.0 / v3.2.1 補正）:
+  // 個人間支払いの反映（iiyo.md / v3.6.0 仕様）:
   // - 通常 (waived=false): paid[from]+=amount, burdens[to]+=amount で資金移動を反映
-  // - waived=true & amount>0: from は Y を実際に to へ渡したものとして計上
-  //   (paid[from]+=Y, burdens[to]+=Y) し、その上で残債 (転送後の burdens-paid) を
-  //   from の burdens から差し引いて from を除く全員で等分負担する。これにより
-  //   from の net が 0 になり、見通し（最小送金）から完全に外れる。
-  // - waived=true & amount=0: 完全免除。from の負債を paid 積み増しで 0 まで戻すのみ
-  //   （他メンバーへは波及させない既存挙動）。
+  // - waived=true（「いいよ！」: 立替えた to が from に「Y だけ払えば完済」と免除）:
+  //   1. Y(=min(入力, 現在の負債 D)) を from→to の実支払いとして計上
+  //   2. 転送後に残る from の負債を burdens から外し from を net 0（完済→見通し除外）に
+  //   3. その残債を from・to を除く「他の債務者(net<0)」で等分肩代わり
+  //   4. 他に債務者がいなければ立替えた to が暗黙的にかぶる（受取が減るだけ）
+  //   amount=0 も同ロジック（Y=0 → 残債全額を他の債務者へ）。from が黒字なら何もしない。
   for (const d of directs) {
     if (d.waived) {
       if (!paid.has(d.fromId) || !burdens.has(d.fromId)) continue;
-      const enteredAmt = Number(d.amount) || 0;
-      if (enteredAmt <= EPSILON) {
-        // 金額未入力の「いいよ！」: from の負債を 0 まで戻すだけ
-        const debt = getNum(burdens, d.fromId, 0) - getNum(paid, d.fromId, 0);
-        if (debt > EPSILON) {
-          paid.set(d.fromId, getNum(paid, d.fromId, 0) + debt);
-        }
-        continue;
-      }
-      // 金額入力ありの「いいよ！」:
-      // from が黒字なら何もしない。負債 D があれば Y(=min(入力, D)) を実転送として
-      // 計上し、転送後に残る負債を from を除く全員で肩代わりして from を net 0 にする。
       const debtBefore =
         getNum(burdens, d.fromId, 0) - getNum(paid, d.fromId, 0);
-      const y = Math.min(enteredAmt, Math.max(debtBefore, 0));
+      if (debtBefore <= EPSILON) continue; // 既に黒字・収支ゼロなら何もしない
+      const enteredAmt = Number(d.amount) || 0;
+      // 1. Y を実支払いとして計上（残債でクランプ。amount=0 なら Y=0）
+      const y = Math.min(Math.max(enteredAmt, 0), debtBefore);
       if (y > EPSILON) {
         paid.set(d.fromId, getNum(paid, d.fromId, 0) + y);
         if (burdens.has(d.toId)) {
           burdens.set(d.toId, getNum(burdens, d.toId, 0) + y);
         }
       }
+      // 2. 転送後に残る負債を from から外す（from を完済 = net 0 に）
       const debt = getNum(burdens, d.fromId, 0) - getNum(paid, d.fromId, 0);
       if (debt > EPSILON) {
         burdens.set(d.fromId, getNum(burdens, d.fromId, 0) - debt);
-        const others = members.filter((m) => m?.id && m.id !== d.fromId);
+        // 3. from・to を除く「他の債務者(net<0)」で残債を等分肩代わり
+        const others = members.filter((m) => {
+          if (!m?.id || m.id === d.fromId || m.id === d.toId) return false;
+          return getNum(paid, m.id, 0) - getNum(burdens, m.id, 0) < -EPSILON;
+        });
         if (others.length > 0) {
           const perHead = debt / others.length;
           for (const m of others) {
             burdens.set(m.id, getNum(burdens, m.id, 0) + perHead);
           }
         }
+        // 4. 他に債務者がいなければ to（立替人）が暗黙的にかぶる（残債は宙に浮き
+        //    to の net がその分残る＝受取減）。
       }
       continue;
     }
