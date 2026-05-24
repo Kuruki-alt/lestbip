@@ -14,12 +14,22 @@ import sirhuIcon from '@/assets/icons/sirhu.png';
  *
  * @param {Object} props
  * @param {(key: string) => string} props.t
+ * @param {import('@/lib/currency').CurrencyCode} [props.currency='JPY']
  * @param {() => void} props.onSave    セッションへ戻る
  * @param {() => void} props.onCancel  セッションへ戻る
  * @param {() => void} props.onWaive   「いいよいいよ〜^^」金額不問で完遂（免除）
  */
-function DirectPaymentScreen({ t, onSave, onCancel, onWaive }) {
+function DirectPaymentScreen({
+  t,
+  currency = 'JPY',
+  onSave,
+  onCancel,
+  onWaive,
+}) {
   const { currentSession, patchSession } = useSessions();
+  // 通貨別の金額入力属性（円は整数、その他はセント=0.01 刻み）
+  const amountStep = currency === 'JPY' ? '1' : '0.01';
+  const amountMode = currency === 'JPY' ? 'numeric' : 'decimal';
   const members = useMemo(
     () => currentSession?.members ?? [],
     [currentSession],
@@ -187,7 +197,8 @@ function DirectPaymentScreen({ t, onSave, onCancel, onWaive }) {
           </span>
           <input
             type="number"
-            inputMode="numeric"
+            inputMode={amountMode}
+            step={amountStep}
             min="0"
             value={amount}
             onChange={handleAmount}
@@ -237,6 +248,7 @@ function DirectPaymentScreen({ t, onSave, onCancel, onWaive }) {
 
 DirectPaymentScreen.propTypes = {
   t: PropTypes.func.isRequired,
+  currency: PropTypes.oneOf(['JPY', 'USD', 'EUR', 'CAD']),
   onSave: PropTypes.func.isRequired,
   onCancel: PropTypes.func.isRequired,
   onWaive: PropTypes.func.isRequired,
