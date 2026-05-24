@@ -1,3 +1,5 @@
+import { currencyDecimals } from './currency';
+
 /**
  * calculator.js — 割り勘計算・最小送金回数アルゴリズム（独立モジュール）。
  *
@@ -70,11 +72,23 @@
 /** 0 比較の許容誤差（浮動小数による微小誤差吸収） */
 const EPSILON = 0.005;
 
-/** 1人あたりの金額に対する端数処理 */
-function applyRounding(value, mode) {
-  if (mode === 'ceil') return Math.ceil(value);
-  if (mode === 'round') return Math.round(value);
-  return Math.floor(value);
+/**
+ * 1人あたりの金額に対する端数処理。
+ * decimals で通貨の最小単位（JPY=0桁/他=2桁）に丸める。
+ * 浮動小数の誤差は toFixed(6) で吸収してからスケール上で丸める。
+ *
+ * @param {number} value
+ * @param {RoundingMode} mode
+ * @param {number} [decimals=0]
+ */
+function applyRounding(value, mode, decimals = 0) {
+  const f = 10 ** decimals;
+  const scaled = Number((value * f).toFixed(6));
+  let r;
+  if (mode === 'ceil') r = Math.ceil(scaled);
+  else if (mode === 'round') r = Math.round(scaled);
+  else r = Math.floor(scaled);
+  return r / f;
 }
 
 /** Map 経由で動的キーアクセスし object injection を回避 */
@@ -108,10 +122,11 @@ function resolveDriverDiscount(payment, overall) {
 /**
  * 1 支払いを、対象メンバーごとの負担額に分解する。
  * 固定金額 → 残額を残対象で均等割り → 端数処理 → 御者割（軽減分を非御者へ比例配分）。
+ * decimals は通貨の小数桁数（JPY=0/他=2）。丸めはこの桁で行う。
  *
  * @returns {Record<string, number>} memberId → 負担額
  */
-function allocatePayment(payment, allMembers, overall, rounding) {
+function allocatePayment(payment, allMembers, overall, rounding, decimals = 0) {
   const excluded = new Set(payment.excludedMemberIds ?? []);
   const included = allMembers.filter((m) => !excluded.has(m.id));
   /** @type {Map<string, number>} */
@@ -135,7 +150,7 @@ function allocatePayment(payment, allMembers, overall, rounding) {
   if (variable.length > 0) {
     const perHead = remaining / variable.length;
     for (const m of variable) {
-      shares.set(m.id, applyRounding(perHead, rounding));
+      shares.set(m.id, applyRounding(perHead, rounding, decimals));
     }
   } else if (Math.abs(remaining) > EPSILON) {
     // 全員固定で残額がある場合は、最初の対象に押し付ける（要件外のエッジ）
@@ -150,7 +165,10 @@ function allocatePayment(payment, allMembers, overall, rounding) {
     const before = getNum(shares, dd.coachmanId, 0);
     const reduction = (before * dd.pct) / 100;
     if (reduction > EPSILON) {
-      shares.set(dd.coachmanId, applyRounding(before - reduction, rounding));
+      shares.set(
+        dd.coachmanId,
+        applyRounding(before - reduction, rounding, decimals),
+      );
       const others = included.filter((m) => m.id !== dd.coachmanId);
       const othersSumBefore = others.reduce(
         (s, m) => s + getNum(shares, m.id, 0),
@@ -161,7 +179,7 @@ function allocatePayment(payment, allMembers, overall, rounding) {
         for (const m of others) {
           const cur = getNum(shares, m.id, 0);
           const add = (cur / othersSumBefore) * reduction;
-          shares.set(m.id, applyRounding(cur + add, rounding));
+          shares.set(m.id, applyRounding(cur + add, rounding, decimals));
         }
       } else if (others.length > 0) {
         // 既存負担が0の場合は均等配分
@@ -169,7 +187,7 @@ function allocatePayment(payment, allMembers, overall, rounding) {
         for (const m of others) {
           shares.set(
             m.id,
-            applyRounding(getNum(shares, m.id, 0) + add, rounding),
+            applyRounding(getNum(shares, m.id, 0) + add, rounding, decimals),
           );
         }
       }
@@ -233,6 +251,8 @@ export function minimumTransfers(net) {
 export function calculateSettlement(session) {
   const members = Array.isArray(session.members) ? session.members : [];
   const rounding = session.rounding ?? 'floor';
+  // 通貨の最小単位で丸める（JPY=0桁 / USD等=2桁）
+  const decimals = currencyDecimals(session.currency);
   const payments = Array.isArray(session.payments) ? session.payments : [];
   const directs = Array.isArray(session.directPayments)
     ? session.directPayments
@@ -245,7 +265,13 @@ export function calculateSettlement(session) {
 
   let roundingDiff = 0;
   for (const p of payments) {
-    const alloc = allocatePayment(p, members, session.driverDiscount, rounding);
+    const alloc = allocatePayment(
+      p,
+      members,
+      session.driverDiscount,
+      rounding,
+      decimals,
+    );
     let sumAlloc = 0;
     for (const [mid, amt] of Object.entries(alloc)) {
       burdens.set(mid, getNum(burdens, mid, 0) + amt);

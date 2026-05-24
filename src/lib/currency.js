@@ -24,6 +24,15 @@ const LANG_LOCALES = new Map([
 ]);
 
 /**
+ * 通貨の小数桁数を返す。JPY は 0 桁、その他は 2 桁（セント単位）。
+ * @param {CurrencyCode} currency
+ * @returns {number}
+ */
+export function currencyDecimals(currency) {
+  return currency === 'JPY' ? 0 : 2;
+}
+
+/**
  * 通貨書式化。
  *
  * @param {number} amount       金額
@@ -33,7 +42,7 @@ const LANG_LOCALES = new Map([
  */
 export function formatAmount(amount, currency, lang) {
   const locale = LANG_LOCALES.get(lang) ?? 'ja-JP';
-  const fractionDigits = currency === 'JPY' ? 0 : 2;
+  const fractionDigits = currencyDecimals(currency);
   return new Intl.NumberFormat(locale, {
     style: 'currency',
     currency,

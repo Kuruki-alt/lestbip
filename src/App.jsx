@@ -240,6 +240,7 @@ function App() {
       <PaymentFormScreen
         t={t}
         lang={lang}
+        currency={displayCurrency}
         editPaymentId={editPaymentId}
         driverDiscountEnabled={driverDiscount}
         onSave={goSession}
@@ -250,6 +251,7 @@ function App() {
     body = (
       <DirectPaymentScreen
         t={t}
+        currency={displayCurrency}
         onSave={goSession}
         onCancel={goSession}
         onWaive={goSession}

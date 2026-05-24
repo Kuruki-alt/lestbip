@@ -19,6 +19,7 @@ import mahoutukaiIcon from '@/assets/icons/mahoutukai.png';
  * @param {Object} props
  * @param {(key: string) => string} props.t
  * @param {'ja'|'en'} [props.lang='ja']
+ * @param {import('@/lib/currency').CurrencyCode} [props.currency='JPY']
  * @param {string|null} props.editPaymentId
  * @param {boolean} [props.driverDiscountEnabled=false]
  * @param {() => void} props.onSave
@@ -27,12 +28,16 @@ import mahoutukaiIcon from '@/assets/icons/mahoutukai.png';
 function PaymentFormScreen({
   t,
   lang = 'ja',
+  currency = 'JPY',
   editPaymentId = null,
   driverDiscountEnabled = false,
   onSave,
   onCancel,
 }) {
   const { currentSession, patchSession } = useSessions();
+  // 通貨別の金額入力属性（円は整数、その他はセント=0.01 刻み）
+  const amountStep = currency === 'JPY' ? '1' : '0.01';
+  const amountMode = currency === 'JPY' ? 'numeric' : 'decimal';
   const members = useMemo(
     () => currentSession?.members ?? [],
     [currentSession],
@@ -271,7 +276,8 @@ function PaymentFormScreen({
             <div className="app-text flex items-center gap-2 text-base">
               <input
                 type="number"
-                inputMode="numeric"
+                inputMode={amountMode}
+                step={amountStep}
                 min="0"
                 value={total}
                 onChange={handleTotal}
@@ -302,7 +308,8 @@ function PaymentFormScreen({
             <span className="app-text-muted">{t('payment.sentenceP1')}</span>
             <input
               type="number"
-              inputMode="numeric"
+              inputMode={amountMode}
+              step={amountStep}
               min="0"
               value={total}
               onChange={handleTotal}
@@ -361,7 +368,8 @@ function PaymentFormScreen({
               <span className="app-text text-sm">{m.name}</span>
               <input
                 type="number"
-                inputMode="numeric"
+                inputMode={amountMode}
+                step={amountStep}
                 min="0"
                 value={fixedAmountMap.get(m.id) ?? ''}
                 data-value={m.id}
@@ -446,6 +454,7 @@ function PaymentFormScreen({
 PaymentFormScreen.propTypes = {
   t: PropTypes.func.isRequired,
   lang: PropTypes.oneOf(['ja', 'en']),
+  currency: PropTypes.oneOf(['JPY', 'USD', 'EUR', 'CAD']),
   editPaymentId: PropTypes.string,
   driverDiscountEnabled: PropTypes.bool,
   onSave: PropTypes.func.isRequired,

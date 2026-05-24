@@ -56,6 +56,50 @@ describe('calculateSettlement — 均等割り基本', () => {
   });
 });
 
+describe('calculateSettlement — 通貨別小数桁数', () => {
+  it('JPY は整数に丸める（従来どおり）', () => {
+    const r = calculateSettlement(
+      makeSession({
+        currency: 'JPY',
+        rounding: 'floor',
+        payments: [{ id: 'p-1', name: 'x', payerId: 'm-1', total: 1000 }],
+      }),
+    );
+    // 1000/3 = 333.33 → floor → 333（整数）
+    expect(r.burdens['m-1']).toBe(333);
+    expect(r.burdens['m-2']).toBe(333);
+  });
+
+  it('USD は小数2桁（セント）に丸める', () => {
+    const r = calculateSettlement(
+      makeSession({
+        currency: 'USD',
+        rounding: 'floor',
+        payments: [{ id: 'p-1', name: 'x', payerId: 'm-1', total: 10 }],
+      }),
+    );
+    // 10/3 = 3.3333 → floor(2桁) → 3.33
+    expect(r.burdens['m-1']).toBe(3.33);
+    expect(r.burdens['m-2']).toBe(3.33);
+    expect(r.burdens['m-3']).toBe(3.33);
+    // 端数 10 - 9.99 = 0.01
+    expect(r.roundingDiff).toBeCloseTo(0.01, 5);
+  });
+
+  it('USD: 小数入力の合計を正しく分割する', () => {
+    const r = calculateSettlement(
+      makeSession({
+        currency: 'USD',
+        rounding: 'round',
+        payments: [{ id: 'p-1', name: 'x', payerId: 'm-1', total: 30.5 }],
+      }),
+    );
+    // 30.50/3 = 10.1666 → round(2桁) → 10.17
+    expect(r.burdens['m-1']).toBe(10.17);
+    expect(r.net['m-1']).toBeCloseTo(30.5 - 10.17, 5);
+  });
+});
+
 describe('calculateSettlement — 固定金額式', () => {
   it('固定金額メンバーの残額を可変メンバーで均等割り', () => {
     const r = calculateSettlement(
