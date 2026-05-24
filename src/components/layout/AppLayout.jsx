@@ -15,7 +15,10 @@ function AppLayout({ topBar, children }) {
       <IconBackdrop />
       <div className="relative z-10">
         {topBar}
-        <main className="mx-auto max-w-2xl px-4 py-5 pb-16">{children}</main>
+        <main className="mx-auto max-w-2xl px-4 py-5">{children}</main>
+        <footer className="app-text-muted mx-auto max-w-2xl px-4 pb-8 pt-4 text-center text-xs">
+          © 2026 Kuruki-alt. All rights reserved.
+        </footer>
       </div>
     </div>
   );
